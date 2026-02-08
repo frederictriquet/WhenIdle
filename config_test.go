@@ -2,8 +2,8 @@ package main
 
 import (
 	"os"
-	"testing"
 	"path/filepath"
+	"testing"
 )
 
 func TestLoadConfigValid(t *testing.T) {
@@ -123,5 +123,61 @@ func TestValidateInvalidWorkingDir(t *testing.T) {
 
 	if err := cfg.Validate(); err == nil {
 		t.Error("Expected validation error for non-existent WorkingDir")
+	}
+}
+
+func TestSaveConfig(t *testing.T) {
+	tmpdir := t.TempDir()
+	configPath := filepath.Join(tmpdir, "config.json")
+
+	cfg := Config{
+		CPUThreshold: 25.5,
+		IdleDuration: 90,
+		CheckInterval: 10,
+		Command: "/bin/sleep",
+		Args: []string{"60"},
+		WorkingDir: "/tmp",
+		LogFile: "/tmp/test.log",
+	}
+
+	// Save config
+	if err := SaveConfig(configPath, cfg); err != nil {
+		t.Fatalf("SaveConfig failed: %v", err)
+	}
+
+	// Verify file exists
+	if _, err := os.Stat(configPath); err != nil {
+		t.Fatalf("Config file was not created: %v", err)
+	}
+
+	// Load it back and verify
+	loaded, err := LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	if loaded.CPUThreshold != cfg.CPUThreshold {
+		t.Errorf("CPUThreshold mismatch: expected %.1f, got %.1f", cfg.CPUThreshold, loaded.CPUThreshold)
+	}
+	if loaded.IdleDuration != cfg.IdleDuration {
+		t.Errorf("IdleDuration mismatch: expected %d, got %d", cfg.IdleDuration, loaded.IdleDuration)
+	}
+	if loaded.Command != cfg.Command {
+		t.Errorf("Command mismatch: expected %q, got %q", cfg.Command, loaded.Command)
+	}
+}
+
+func TestSaveConfigInvalidPath(t *testing.T) {
+	cfg := Config{
+		CPUThreshold: 20.0,
+		IdleDuration: 60,
+		CheckInterval: 5,
+		Command: "/bin/echo",
+	}
+
+	// Try to save to a non-existent directory
+	err := SaveConfig("/nonexistent/dir/config.json", cfg)
+	if err == nil {
+		t.Error("Expected error when saving to non-existent directory")
 	}
 }

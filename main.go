@@ -12,10 +12,19 @@ import (
 
 func main() {
 	configPath := flag.String("config", "", "Path to configuration file (JSON)")
+	guiMode := flag.Bool("gui", false, "Run with system tray GUI")
 	flag.Parse()
 
+	// GUI mode
+	if *guiMode {
+		RunGUI(*configPath) // Blocks on main thread
+		return
+	}
+
+	// CLI mode (original behavior)
 	if *configPath == "" {
 		fmt.Fprintln(os.Stderr, "Usage: whenidle --config <path-to-config.json>")
+		fmt.Fprintln(os.Stderr, "   or: whenidle --gui [--config <path>]")
 		os.Exit(1)
 	}
 

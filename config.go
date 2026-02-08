@@ -6,6 +6,12 @@ import (
 	"os"
 )
 
+const (
+	defaultCPUThreshold  = 15.0 // percent
+	defaultIdleDuration  = 120  // seconds
+	defaultCheckInterval = 5    // seconds
+)
+
 type Config struct {
 	CPUThreshold  float64  `json:"cpu_threshold"`
 	IdleDuration  int      `json:"idle_duration"`
@@ -38,13 +44,13 @@ func LoadConfig(path string) (Config, error) {
 
 func (c *Config) applyDefaults() {
 	if c.CPUThreshold == 0 {
-		c.CPUThreshold = 15.0
+		c.CPUThreshold = defaultCPUThreshold
 	}
 	if c.IdleDuration == 0 {
-		c.IdleDuration = 120
+		c.IdleDuration = defaultIdleDuration
 	}
 	if c.CheckInterval == 0 {
-		c.CheckInterval = 5
+		c.CheckInterval = defaultCheckInterval
 	}
 }
 
@@ -70,5 +76,19 @@ func (c Config) Validate() error {
 			return fmt.Errorf("working_dir %q is not a directory", c.WorkingDir)
 		}
 	}
+	return nil
+}
+
+// SaveConfig writes the config to the specified JSON file with pretty-printing.
+func SaveConfig(path string, cfg Config) error {
+	data, err := json.MarshalIndent(cfg, "", "    ")
+	if err != nil {
+		return fmt.Errorf("cannot marshal config: %w", err)
+	}
+
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("cannot write config file: %w", err)
+	}
+
 	return nil
 }
