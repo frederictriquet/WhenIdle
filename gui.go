@@ -34,6 +34,9 @@ type GUI struct {
 	enableItem *fyne.MenuItem
 	cancelMon  context.CancelFunc
 	monCtx     context.Context
+
+	logsWindow   fyne.Window
+	configWindow fyne.Window
 }
 
 // RunGUI starts the Fyne application with system tray.
@@ -210,10 +213,17 @@ func (g *GUI) updateTrayIcon() {
 	}
 }
 
-// showConfigWindow opens a dialog with the configuration form.
+// showConfigWindow opens a dialog with the configuration form, or brings an existing one to front.
 func (g *GUI) showConfigWindow() {
+	if g.configWindow != nil {
+		g.configWindow.Show()
+		g.configWindow.RequestFocus()
+		return
+	}
+
 	w := g.app.NewWindow("Configure Task")
 	w.Resize(fyne.NewSize(500, 400))
+	g.configWindow = w
 
 	// Create form fields
 	commandEntry := widget.NewEntry()
@@ -294,14 +304,21 @@ func (g *GUI) showConfigWindow() {
 			}
 
 			log.Printf("[INFO] Configuration updated: command=%s", newCfg.Command)
+			g.configWindow = nil
 			w.Close()
 		},
 		OnCancel: func() {
+			g.configWindow = nil
 			w.Close()
 		},
 		SubmitText: "Save",
 		CancelText: "Cancel",
 	}
+
+	w.SetCloseIntercept(func() {
+		g.configWindow = nil
+		w.Close()
+	})
 
 	w.SetContent(container.NewVBox(
 		widget.NewLabel("Configure Task Settings"),
@@ -310,10 +327,17 @@ func (g *GUI) showConfigWindow() {
 	w.Show()
 }
 
-// showLogsWindow opens a window displaying live logs.
+// showLogsWindow opens a window displaying live logs, or brings an existing one to front.
 func (g *GUI) showLogsWindow() {
+	if g.logsWindow != nil {
+		g.logsWindow.Show()
+		g.logsWindow.RequestFocus()
+		return
+	}
+
 	w := g.app.NewWindow("Logs")
 	w.Resize(fyne.NewSize(700, 500))
+	g.logsWindow = w
 
 	// RichText is read-only by nature and displays with normal text colors
 	// (unlike a disabled MultiLineEntry which greys out text).
@@ -337,6 +361,7 @@ func (g *GUI) showLogsWindow() {
 	// Unregister onChange when window closes
 	w.SetCloseIntercept(func() {
 		g.logBuf.SetOnChange(nil)
+		g.logsWindow = nil
 		w.Close()
 	})
 

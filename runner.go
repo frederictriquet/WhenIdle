@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -37,12 +38,15 @@ type TaskRunner struct {
 	state  TaskState
 	mu     sync.Mutex
 	done   chan struct{}
+	env    []string // environment for spawned processes
 }
 
 func NewTaskRunner(config Config) *TaskRunner {
+	env := resolveLoginEnv()
 	return &TaskRunner{
 		config: config,
 		state:  Stopped,
+		env:    env,
 	}
 }
 
@@ -95,6 +99,10 @@ func (r *TaskRunner) start() {
 
 	r.cmd.Stdout = os.Stdout
 	r.cmd.Stderr = os.Stderr
+
+	if r.env != nil {
+		r.cmd.Env = r.env
+	}
 
 	if err := r.cmd.Start(); err != nil {
 		log.Printf("[ERROR] Failed to start task: %v", err)
@@ -218,4 +226,36 @@ func (r *TaskRunner) WaitDone() {
 	if done != nil {
 		<-done
 	}
+}
+
+// resolveLoginEnv returns the current process environment with PATH replaced
+// by the user's login shell PATH. This is necessary when running as a macOS
+// Launch Agent, which provides only a minimal PATH (/usr/bin:/bin:/usr/sbin:/sbin).
+func resolveLoginEnv() []string {
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "/bin/zsh"
+	}
+
+	out, err := exec.Command(shell, "-l", "-c", "echo $PATH").Output()
+	if err != nil {
+		log.Printf("[WARN] Cannot resolve login shell PATH via %s: %v", shell, err)
+		return nil
+	}
+
+	loginPATH := strings.TrimSpace(string(out))
+	if loginPATH == "" {
+		return nil
+	}
+
+	env := os.Environ()
+	for i, e := range env {
+		if strings.HasPrefix(e, "PATH=") {
+			env[i] = "PATH=" + loginPATH
+			log.Printf("[INFO] Resolved login shell PATH: %s", loginPATH)
+			return env
+		}
+	}
+
+	return append(env, "PATH="+loginPATH)
 }
