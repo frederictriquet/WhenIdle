@@ -9,7 +9,9 @@ import (
 	"fyne.io/fyne/v2"
 )
 
-const iconSize = 22 // macOS menu bar icon size
+// iconSize is the recommended size for macOS menu bar icons (22x22 pixels).
+// Using standard size ensures proper display on Retina and non-Retina displays.
+const iconSize = 22
 
 // Tray icon states: a simple filled circle with different colors.
 var (

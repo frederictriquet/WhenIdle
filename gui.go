@@ -348,8 +348,9 @@ func (g *GUI) showLogsWindow() {
 	w.Show()
 }
 
-// splitArgs splits a string into arguments, respecting quoted strings.
-// Simple implementation: splits on spaces, doesn't handle complex quoting.
+// splitArgs splits a string into arguments using whitespace as delimiter.
+// Simple implementation: doesn't handle quoted strings (e.g., "hello world").
+// For more advanced parsing, consider a shell parser library.
 func splitArgs(s string) []string {
 	s = strings.TrimSpace(s)
 	if s == "" {

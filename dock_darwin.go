@@ -13,9 +13,12 @@ void hideFromDock() {
 */
 import "C"
 
-// HideFromDock sets the macOS activation policy to "accessory",
-// which hides the app from the Dock and the Cmd-Tab switcher.
-// Uses dispatch_async to ensure it runs on the main thread.
+// HideFromDock sets the macOS activation policy to NSApplicationActivationPolicyAccessory.
+// This prevents the app from appearing in the Dock and Cmd-Tab switcher, making it
+// a background-only (menu bar) application.
+//
+// Must be called after the Fyne app is created, typically via SetOnStarted lifecycle hook,
+// to ensure NSApp is initialized. Uses dispatch_async to guarantee main thread execution.
 func HideFromDock() {
 	C.hideFromDock()
 }

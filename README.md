@@ -30,21 +30,24 @@ Arrêt du daemon → Termine proprement la tâche (SIGTERM/SIGKILL)
 
 ## Fonctionnalités
 
+- ✅ **Interface graphique (GUI)** dans la barre de menu macOS (system tray)
 - ✅ **Surveillance CPU en temps réel** avec seuil configurable
 - ✅ **Suspension/reprise automatique** via SIGSTOP/SIGCONT
 - ✅ **Process group signaling** pour gérer toute l'arborescence de processus
 - ✅ **Launch Agent macOS** pour démarrage automatique au login
-- ✅ **Configuration JSON** simple et flexible
-- ✅ **Logging configurable** (stdout ou fichier)
+- ✅ **Configuration via GUI** ou fichier JSON
+- ✅ **Logs en temps réel** visibles dans la GUI
+- ✅ **Icônes dynamiques** indiquant l'état (idle/running/paused)
+- ✅ **Mode headless (CLI)** disponible sans GUI
 - ✅ **Graceful shutdown** avec timeout SIGKILL
-- ✅ **Binary standalone** sans dépendances runtime (3.4 MB)
+- ✅ **Binary standalone** sans dépendances runtime (~32 MB)
 
 ## Installation
 
 ### Prérequis
 
 - macOS 10.14+ (Darwin)
-- Go 1.18+ (pour compiler depuis les sources)
+- Go 1.18+ avec CGO (pour compiler depuis les sources)
 
 ### Installation automatique
 
@@ -54,10 +57,13 @@ cd /path/to/WhenIdle
 ```
 
 Cette commande :
-1. Compile le binary `whenidle`
-2. L'installe dans `~/.local/bin/`
-3. Crée une configuration par défaut dans `~/.config/whenidle/config.json`
-4. Configure le Launch Agent dans `~/Library/LaunchAgents/`
+1. Compile le binary `whenidle` avec support GUI (CGO + Fyne)
+2. Crée un bundle `.app` dans `~/Applications/WhenIdle.app/`
+3. Installe aussi le CLI dans `~/.local/bin/`
+4. Crée une configuration par défaut dans `~/.config/whenidle/config.json`
+5. Configure le Launch Agent dans `~/Library/LaunchAgents/`
+
+**Note** : L'app apparaîtra dans votre **barre de menu** (menu bar), pas dans le Dock.
 
 ### Installation manuelle
 
@@ -130,53 +136,79 @@ Exemple : avec `idle_duration=120` et `check_interval=5`, la tâche se lance apr
 
 ## Utilisation
 
-### Démarrer le daemon
+### Mode GUI (recommandé)
+
+L'interface graphique s'affiche dans la **barre de menu** macOS (system tray).
+
+#### Démarrer la GUI
 
 ```bash
 launchctl load ~/Library/LaunchAgents/com.whenidle.agent.plist
 ```
 
-### Arrêter le daemon
+Une icône apparaît dans votre barre de menu avec les couleurs suivantes :
+- 🔴 **Gris** : Monitoring désactivé
+- 🟢 **Vert** : Monitoring actif, système idle
+- 🔵 **Bleu** : Tâche en cours d'exécution
+- 🟠 **Orange** : Tâche mise en pause (CPU busy)
 
-```bash
-launchctl unload ~/Library/LaunchAgents/com.whenidle.agent.plist
-```
+#### Menu de l'icône
 
-### Redémarrer le daemon
+- **Enable/Disable Monitoring** : Active ou désactive le monitoring
+- **Configure Task...** : Ouvre une fenêtre pour configurer la tâche
+- **View Logs...** : Affiche les logs en temps réel (dernières 500 lignes)
+- **Quit** : Arrête l'application proprement
 
-```bash
-launchctl unload ~/Library/LaunchAgents/com.whenidle.agent.plist
-launchctl load ~/Library/LaunchAgents/com.whenidle.agent.plist
-```
+#### Configuration via GUI
 
-### Vérifier le statut
+1. Cliquez sur l'icône dans la barre de menu
+2. Sélectionnez **"Configure Task..."**
+3. Modifiez les paramètres dans le formulaire
+4. Cliquez **"Save"**
+5. Si le monitoring est actif, il redémarre automatiquement avec la nouvelle config
 
-```bash
-launchctl list | grep whenidle
-```
+#### Visualiser les logs
 
-### Consulter les logs
+1. Cliquez sur l'icône dans la barre de menu
+2. Sélectionnez **"View Logs..."**
+3. Les logs s'affichent en temps réel dans une fenêtre scrollable
 
-Les logs sont écrits dans :
-- **Stdout du daemon** : `/tmp/whenidle.stdout.log`
-- **Stderr du daemon** : `/tmp/whenidle.stderr.log`
-- **Log de la tâche** : Configuré via `log_file` (ou mélangé avec stdout)
+### Mode CLI (headless)
 
-```bash
-# Logs du daemon
-tail -f /tmp/whenidle.stdout.log
-
-# Logs en temps réel
-log stream --predicate 'processImagePath contains "whenidle"'
-```
-
-### Exécution manuelle (sans Launch Agent)
+Pour utiliser WhenIdle sans GUI (ex: via SSH) :
 
 ```bash
 ~/.local/bin/whenidle --config ~/.config/whenidle/config.json
 ```
 
 Arrêt : `Ctrl+C`
+
+### Commandes utiles
+
+#### Arrêter l'application
+
+```bash
+launchctl unload ~/Library/LaunchAgents/com.whenidle.agent.plist
+```
+
+#### Redémarrer
+
+```bash
+launchctl unload ~/Library/LaunchAgents/com.whenidle.agent.plist
+launchctl load ~/Library/LaunchAgents/com.whenidle.agent.plist
+```
+
+#### Vérifier le statut
+
+```bash
+launchctl list | grep whenidle
+```
+
+#### Consulter les logs (si besoin brut)
+
+```bash
+tail -f /tmp/whenidle.stdout.log
+```
 
 ## Exemples
 
@@ -247,9 +279,36 @@ rm -rf ~/.config/whenidle
 
 ### Composants
 
+#### Mode GUI
 ```
 ┌─────────────────────────────────────────────┐
-│              WhenIdle                        │
+│              WhenIdle GUI                    │
+│                                              │
+│  ┌──────────┐   ┌─────────┐                │
+│  │   Fyne   │   │LogBuffer│                │
+│  │System Tray◀─┤Ring (500)│◀────┐          │
+│  └─────┬────┘   └─────────┘     │          │
+│        │                          │          │
+│        ▼                          │          │
+│  ┌──────────┐   ┌──────────────┐│          │
+│  │  Config   │──▶│   Monitor    ├┘          │
+│  │  (JSON)   │   │  (CPU poll)  │           │
+│  └──────────┘   └──────┬───────┘           │
+│                         │                    │
+│                         ▼                    │
+│                  ┌──────────────┐           │
+│                  │ Task Runner  │           │
+│                  │ (exec, STOP/ │           │
+│                  │  CONT, TERM) │           │
+│                  └──────────────┘           │
+│                                              │
+└──────────────────────────────────────────────┘
+```
+
+#### Mode CLI
+```
+┌─────────────────────────────────────────────┐
+│              WhenIdle CLI                    │
 │                                              │
 │  ┌──────────┐   ┌──────────────┐           │
 │  │  Config   │──▶│   Monitor    │           │
@@ -289,11 +348,16 @@ rm -rf ~/.config/whenidle
 
 | Fichier | Rôle |
 |---------|------|
-| `main.go` | Point d'entrée, orchestration, signal handling |
-| `config.go` | Chargement et validation de la configuration |
-| `monitor.go` | Surveillance CPU avec boucle de polling (gopsutil) |
+| `main.go` | Point d'entrée, routing CLI/GUI |
+| `gui.go` | Interface Fyne (system tray, config, logs) |
+| `logbuf.go` | Ring buffer thread-safe pour les logs |
+| `icon.go` | Génération programmatique des icônes tray |
+| `dock_darwin.go` | CGo pour cacher l'app du Dock macOS |
+| `dock_other.go` | Stub no-op pour plateformes non-Darwin |
+| `config.go` | Chargement, sauvegarde et validation JSON |
+| `monitor.go` | Surveillance CPU avec boucle de polling |
 | `runner.go` | Gestion du processus (exec, SIGSTOP/SIGCONT/SIGTERM) |
-| `*_test.go` | Tests unitaires |
+| `*_test.go` | Tests unitaires (24 tests) |
 
 ## Développement
 
@@ -305,7 +369,11 @@ rm -rf ~/.config/whenidle
 ### Compiler
 
 ```bash
-go build -o whenidle .
+# Avec GUI (nécessite CGO)
+CGO_ENABLED=1 go build -o whenidle .
+
+# Sans GUI (headless, plus petit binary)
+go build -tags no_gui -o whenidle .
 ```
 
 ### Exécuter les tests
@@ -324,34 +392,41 @@ go test -v -cover ./...
 
 ```
 .
-├── main.go              # Orchestration principale
-├── config.go            # Configuration JSON
-├── monitor.go           # Surveillance CPU
-├── runner.go            # Gestion du processus
-├── config_test.go       # Tests de configuration
-├── monitor_test.go      # Tests du monitor
-├── runner_test.go       # Tests du runner
-├── config.example.json  # Exemple de configuration
-├── install.sh           # Script d'installation
-├── uninstall.sh         # Script de désinstallation
+├── main.go                   # Point d'entrée CLI/GUI
+├── gui.go                    # Interface Fyne (system tray)
+├── logbuf.go                 # Ring buffer pour logs
+├── logbuf_test.go            # Tests du LogBuffer
+├── icon.go                   # Génération icônes tray
+├── dock_darwin.go            # CGo pour cacher du Dock
+├── dock_other.go             # Stub non-Darwin
+├── config.go                 # Config JSON (load/save)
+├── config_test.go            # Tests config
+├── monitor.go                # Surveillance CPU
+├── monitor_test.go           # Tests monitor
+├── runner.go                 # Gestion processus
+├── runner_test.go            # Tests runner
+├── config.example.json       # Config par défaut
+├── install.sh                # Installation + .app bundle
+├── uninstall.sh              # Désinstallation
 ├── com.whenidle.agent.plist  # Template Launch Agent
-└── README.md            # Cette documentation
+└── README.md                 # Cette documentation
 ```
 
 ### Tests
 
-Le projet inclut 13 tests unitaires couvrant :
-- Validation de la configuration
+Le projet inclut 24 tests unitaires couvrant :
+- Validation de la configuration (save/load round-trip)
+- LogBuffer (ring buffer, thread safety, onChange callbacks)
 - Machine à états du runner (Stopped → Running → Paused)
 - Logique de détection idle/busy du monitor
 - Signaling SIGSTOP/SIGCONT/SIGTERM
 
-Couverture : ~60%
+Couverture : ~65%
 
 ### Dépendances
 
-Une seule dépendance externe :
 - `github.com/shirou/gopsutil/v4` — Monitoring CPU cross-platform
+- `fyne.io/fyne/v2` — Framework GUI et system tray (v2.7.2)
 
 ## FAQ
 
@@ -381,6 +456,17 @@ WhenIdle envoie d'abord SIGTERM, puis SIGKILL après 5 secondes. Si votre proces
 ### Q: Puis-je lancer plusieurs tâches différentes ?
 
 Non, un seul daemon = une seule tâche. Pour plusieurs tâches, créez plusieurs configurations et Launch Agents avec des noms différents.
+
+### Q: L'icône n'apparaît pas dans la barre de menu ?
+
+Vérifiez :
+1. Que le Launch Agent pointe bien vers `~/Applications/WhenIdle.app/Contents/MacOS/whenidle`
+2. Les logs : `tail -f /tmp/whenidle.stdout.log`
+3. Relancez : `launchctl unload ... && launchctl load ...`
+
+### Q: L'app apparaît dans le Dock au lieu de la barre de menu ?
+
+Le bundle `.app` doit avoir `LSUIElement=true` dans `Info.plist`. Ré-exécutez `./install.sh`.
 
 ## License
 
