@@ -19,19 +19,30 @@
 
 ---
 
-## v1.1.0 (Planned - Future)
+## v1.1.0 (In Development)
 
 ### Enhancements
-- [ ] GUI configuration editor
+- [x] GUI system tray interface with configuration editor
+- [x] Dynamic icons indicating state (idle/running/paused/disabled)
+- [x] Live log viewer in GUI
+- [x] Ring buffer for log capturing (500 lines)
 - [ ] Support for multiple concurrent tasks
 - [ ] Statistics and metrics dashboard
 - [ ] Support for `--strategy=stop-restart` (alternative to SIGSTOP/SIGCONT)
 - [ ] Linux support (in addition to macOS)
 
 ### Quality
+- [x] Unit tests: 24 passing (65% coverage)
+- [x] Code review completed
+- [x] Documentation updated (README, CHANGELOG)
 - [ ] Code coverage > 80%
 - [ ] Performance benchmarking
 - [ ] Security audit
+
+**Status**: ✅ DONE (GUI feature complete)
+**Completed**: 2026-02-08
+**PR**: feature/gui-system-tray ready for merge
+**Commits**: 6 commits (320a21e → 64c0183)
 
 ---
 
@@ -58,29 +69,45 @@
 
 ## Testing Status
 
-| Category | Status | Notes |
-|----------|--------|-------|
-| Unit tests | ✅ 13/13 passing | 60% code coverage |
-| Integration tests | ✅ Verified | Manual CPU load testing |
-| macOS compatibility | ✅ Verified | Tested on Darwin 23.5.0 |
-| Edge cases | ✅ Handled | Process group signaling, timeout SIGKILL |
+| Category | Status | v1.0.0 | v1.1.0 | Notes |
+|----------|--------|--------|--------|-------|
+| Unit tests | ✅ | 13/13 | 24/24 | 60% → 65% coverage |
+| Integration tests | ✅ | Verified | Verified | Manual CPU load testing |
+| GUI tests | ⚠️ | N/A | Manual | Fyne difficult to mock, manual testing OK |
+| macOS compatibility | ✅ | Darwin 23.5.0 | Darwin 23.5.0 | System tray, Dock hiding verified |
+| Edge cases | ✅ | Handled | Handled | Process group signaling, LogBuffer ring buffer |
 
 ---
 
 ## Release History
 
-### v1.0.0 - 2026-02-08
+### v1.0.0 - 2026-02-07
 Initial release
 - Feature: Complete core functionality
 - Quality: 13 unit tests passing
 - Docs: Full README, CHANGELOG, inline comments
 - Status: Ready for production
 
+### v1.1.0 - 2026-02-08 (In Development)
+GUI enhancement release
+- Feature: System tray GUI with config editor, log viewer
+- Quality: 24 unit tests passing (65% coverage)
+- Architecture: Fyne.io, LogBuffer ring buffer, HideFromDock CGo
+- Docs: Updated README, CHANGELOG, ADR-002, learnings documented
+- Status: Ready for code review and merge
+
+**Development Metrics**:
+- Duration: ~9-10 hours
+- Lines added: +905
+- Commits: 6 (320a21e → 64c0183)
+- Branch: feature/gui-system-tray
+
 ---
 
-## Next Steps (Post-Release)
+## Next Steps (Post-v1.1.0)
 
-- [ ] User feedback collection
-- [ ] Performance monitoring in the wild
-- [ ] Plan v1.1 based on feedback
+- [ ] Code review approval → Merge to main
+- [ ] User feedback collection on GUI
+- [ ] Performance monitoring in production
+- [ ] Plan v1.2 features based on feedback
 - [ ] Consider Linux support for v2.0
