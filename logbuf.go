@@ -24,10 +24,9 @@ func NewLogBuffer(maxLines int) *LogBuffer {
 }
 
 // Write implements io.Writer. It appends p to the buffer, splitting on newlines.
-// Calls onChange callback if set (from a goroutine, so onChange should be thread-safe).
+// Calls onChange callback (if set) after releasing the lock to avoid deadlocks.
 func (b *LogBuffer) Write(p []byte) (n int, err error) {
 	b.mu.Lock()
-	defer b.mu.Unlock()
 
 	// Split on newlines
 	lines := bytes.Split(p, []byte("\n"))
@@ -47,11 +46,14 @@ func (b *LogBuffer) Write(p []byte) (n int, err error) {
 		}
 	}
 
-	// Notify listener of new content (if registered)
-	if b.onChange != nil {
-		// Call onChange without lock to avoid deadlock if onChange tries to read
-		onChange := b.onChange
-		go onChange()
+	// Capture callback before releasing lock
+	onChange := b.onChange
+	b.mu.Unlock()
+
+	// Notify listener after releasing the lock to avoid deadlock
+	// and without spawning a goroutine per write.
+	if onChange != nil {
+		onChange()
 	}
 
 	return len(p), nil
@@ -70,8 +72,8 @@ func (b *LogBuffer) Lines() []string {
 }
 
 // SetOnChange registers a callback invoked when new log lines arrive.
-// The callback is called from a goroutine, so it should be thread-safe.
-// Pass nil to unregister.
+// The callback is called synchronously from the writing goroutine (after
+// releasing the lock), so it should not block for long. Pass nil to unregister.
 func (b *LogBuffer) SetOnChange(fn func()) {
 	b.mu.Lock()
 	defer b.mu.Unlock()

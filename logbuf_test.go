@@ -4,7 +4,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 )
 
 func TestLogBufferWrite(t *testing.T) {
@@ -64,26 +63,17 @@ func TestLogBufferRingBehavior(t *testing.T) {
 func TestLogBufferOnChange(t *testing.T) {
 	buf := NewLogBuffer(10)
 
-	var mu sync.Mutex
 	callCount := 0
 
 	buf.SetOnChange(func() {
-		mu.Lock()
-		defer mu.Unlock()
 		callCount++
 	})
 
 	buf.Write([]byte("line 1\n"))
+	buf.Write([]byte("line 2\n"))
 
-	// onChange is called in a goroutine, so wait a bit
-	time.Sleep(50 * time.Millisecond)
-
-	mu.Lock()
-	count := callCount
-	mu.Unlock()
-
-	if count == 0 {
-		t.Error("Expected onChange to be called at least once")
+	if callCount != 2 {
+		t.Errorf("Expected onChange called 2 times, got %d", callCount)
 	}
 }
 

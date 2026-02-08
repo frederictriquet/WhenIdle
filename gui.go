@@ -145,7 +145,17 @@ func (g *GUI) toggleEnabled() {
 // startMonitoring creates and starts the monitor and runner.
 func (g *GUI) startMonitoring() {
 	g.runner = NewTaskRunner(g.config)
-	g.monitor = NewCPUMonitor(g.config, g.runner.OnIdle, g.runner.OnBusy, g.runner.State)
+
+	// Wrap callbacks to update tray icon when task state changes
+	onIdle := func() {
+		g.runner.OnIdle()
+		fyne.Do(func() { g.updateTrayIcon() })
+	}
+	onBusy := func() {
+		g.runner.OnBusy()
+		fyne.Do(func() { g.updateTrayIcon() })
+	}
+	g.monitor = NewCPUMonitor(g.config, onIdle, onBusy, g.runner.State)
 
 	g.monCtx, g.cancelMon = context.WithCancel(context.Background())
 	go g.monitor.Start(g.monCtx)
@@ -234,36 +244,35 @@ func (g *GUI) showConfigWindow() {
 			{Text: "Check Interval (s)", Widget: checkIntervalEntry, HintText: "Seconds, default 5"},
 		},
 		OnSubmit: func() {
-			// Parse and validate
-			newCfg := Config{
-				Command:    commandEntry.Text,
-				Args:       splitArgs(argsEntry.Text),
-				WorkingDir: workdirEntry.Text,
-			}
-
 			// Parse numeric fields
 			threshold, err := strconv.ParseFloat(thresholdEntry.Text, 64)
-			if err != nil || threshold <= 0 || threshold > 100 {
-				dialog.ShowError(fmt.Errorf("invalid CPU threshold: must be 0-100"), w)
+			if err != nil {
+				dialog.ShowError(fmt.Errorf("CPU threshold: %w", err), w)
 				return
 			}
-			newCfg.CPUThreshold = threshold
 
 			idleDur, err := strconv.Atoi(idleDurationEntry.Text)
-			if err != nil || idleDur <= 0 {
-				dialog.ShowError(fmt.Errorf("invalid idle duration: must be positive integer"), w)
+			if err != nil {
+				dialog.ShowError(fmt.Errorf("idle duration: %w", err), w)
 				return
 			}
-			newCfg.IdleDuration = idleDur
 
 			checkInt, err := strconv.Atoi(checkIntervalEntry.Text)
-			if err != nil || checkInt <= 0 {
-				dialog.ShowError(fmt.Errorf("invalid check interval: must be positive integer"), w)
+			if err != nil {
+				dialog.ShowError(fmt.Errorf("check interval: %w", err), w)
 				return
 			}
-			newCfg.CheckInterval = checkInt
 
-			// Validate
+			newCfg := Config{
+				Command:       commandEntry.Text,
+				Args:          splitArgs(argsEntry.Text),
+				WorkingDir:    workdirEntry.Text,
+				CPUThreshold:  threshold,
+				IdleDuration:  idleDur,
+				CheckInterval: checkInt,
+			}
+
+			// Single source of truth for validation
 			if err := newCfg.Validate(); err != nil {
 				dialog.ShowError(err, w)
 				return
