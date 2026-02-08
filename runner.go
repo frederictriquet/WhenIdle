@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -126,19 +127,8 @@ func (r *TaskRunner) wait() {
 }
 
 func (r *TaskRunner) pause() {
-	if r.cmd == nil || r.cmd.Process == nil {
-		return
-	}
-
-	// Send SIGSTOP to the process group
-	pgid, err := syscall.Getpgid(r.cmd.Process.Pid)
-	if err != nil {
-		log.Printf("[ERROR] Failed to get process group: %v", err)
-		return
-	}
-
-	if err := syscall.Kill(-pgid, syscall.SIGSTOP); err != nil {
-		log.Printf("[ERROR] Failed to pause task (SIGSTOP): %v", err)
+	if err := r.signalGroup(syscall.SIGSTOP); err != nil {
+		log.Printf("[ERROR] Failed to pause task: %v", err)
 		return
 	}
 
@@ -147,18 +137,8 @@ func (r *TaskRunner) pause() {
 }
 
 func (r *TaskRunner) resume() {
-	if r.cmd == nil || r.cmd.Process == nil {
-		return
-	}
-
-	pgid, err := syscall.Getpgid(r.cmd.Process.Pid)
-	if err != nil {
-		log.Printf("[ERROR] Failed to get process group: %v", err)
-		return
-	}
-
-	if err := syscall.Kill(-pgid, syscall.SIGCONT); err != nil {
-		log.Printf("[ERROR] Failed to resume task (SIGCONT): %v", err)
+	if err := r.signalGroup(syscall.SIGCONT); err != nil {
+		log.Printf("[ERROR] Failed to resume task: %v", err)
 		return
 	}
 
@@ -167,6 +147,26 @@ func (r *TaskRunner) resume() {
 }
 
 const stopTimeout = 5 * time.Second
+
+// signalGroup sends a signal to the entire process group of the running task.
+// Returns an error if the process group cannot be determined or the signal fails.
+// Must be called with mu locked.
+func (r *TaskRunner) signalGroup(sig syscall.Signal) error {
+	if r.cmd == nil || r.cmd.Process == nil {
+		return fmt.Errorf("no running process")
+	}
+
+	pgid, err := syscall.Getpgid(r.cmd.Process.Pid)
+	if err != nil {
+		return fmt.Errorf("failed to get process group: %w", err)
+	}
+
+	if err := syscall.Kill(-pgid, sig); err != nil {
+		return fmt.Errorf("failed to send %v to process group: %w", sig, err)
+	}
+
+	return nil
+}
 
 // Stop terminates the task gracefully. If paused, resumes first then sends SIGTERM.
 // If the process doesn't exit within 5 seconds, sends SIGKILL.
@@ -178,22 +178,15 @@ func (r *TaskRunner) Stop() {
 		return
 	}
 
-	pgid, err := syscall.Getpgid(r.cmd.Process.Pid)
-	if err != nil {
-		log.Printf("[ERROR] Failed to get process group for stop: %v", err)
-		r.mu.Unlock()
-		return
-	}
-
 	// If paused, resume first so the process can handle SIGTERM gracefully.
 	// A SIGTERM sent to a SIGSTOP'd process is queued but not delivered until SIGCONT.
 	if r.state == Paused {
-		_ = syscall.Kill(-pgid, syscall.SIGCONT)
+		_ = r.signalGroup(syscall.SIGCONT)
 	}
 
 	log.Printf("[INFO] Stopping task (PID %d)...", r.cmd.Process.Pid)
-	if err := syscall.Kill(-pgid, syscall.SIGTERM); err != nil {
-		log.Printf("[ERROR] Failed to send SIGTERM: %v", err)
+	if err := r.signalGroup(syscall.SIGTERM); err != nil {
+		log.Printf("[ERROR] Failed to stop task: %v", err)
 	}
 
 	done := r.done
@@ -209,13 +202,8 @@ func (r *TaskRunner) Stop() {
 		case <-time.After(stopTimeout):
 			// Process didn't exit gracefully within timeout, force kill
 			r.mu.Lock()
-			if r.cmd != nil && r.cmd.Process != nil {
-				log.Printf("[WARN] Task did not exit after %v, sending SIGKILL", stopTimeout)
-				pgid, err := syscall.Getpgid(r.cmd.Process.Pid)
-				if err == nil {
-					_ = syscall.Kill(-pgid, syscall.SIGKILL)
-				}
-			}
+			log.Printf("[WARN] Task did not exit after %v, sending SIGKILL", stopTimeout)
+			_ = r.signalGroup(syscall.SIGKILL)
 			r.mu.Unlock()
 		}
 	}

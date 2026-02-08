@@ -6,6 +6,12 @@ import (
 	"os"
 )
 
+const (
+	defaultCPUThreshold  = 15.0 // percent
+	defaultIdleDuration  = 120  // seconds
+	defaultCheckInterval = 5    // seconds
+)
+
 type Config struct {
 	CPUThreshold  float64  `json:"cpu_threshold"`
 	IdleDuration  int      `json:"idle_duration"`
@@ -38,13 +44,13 @@ func LoadConfig(path string) (Config, error) {
 
 func (c *Config) applyDefaults() {
 	if c.CPUThreshold == 0 {
-		c.CPUThreshold = 15.0
+		c.CPUThreshold = defaultCPUThreshold
 	}
 	if c.IdleDuration == 0 {
-		c.IdleDuration = 120
+		c.IdleDuration = defaultIdleDuration
 	}
 	if c.CheckInterval == 0 {
-		c.CheckInterval = 5
+		c.CheckInterval = defaultCheckInterval
 	}
 }
 
