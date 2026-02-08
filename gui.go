@@ -23,15 +23,17 @@ const defaultGUIConfigPath = ".config/whenidle/config.json"
 // GUI holds the Fyne application state and references to daemon components.
 type GUI struct {
 	app        fyne.App
+	desk       desktop.App
 	runner     *TaskRunner
 	monitor    *CPUMonitor
 	logBuf     *LogBuffer
 	config     Config
 	configPath string
 
-	enabled   bool
-	cancelMon context.CancelFunc
-	monCtx    context.Context
+	enabled    bool
+	enableItem *fyne.MenuItem
+	cancelMon  context.CancelFunc
+	monCtx     context.Context
 }
 
 // RunGUI starts the Fyne application with system tray.
@@ -76,8 +78,10 @@ func RunGUI(configPath string) {
 	log.Println("[INFO] WhenIdle GUI starting")
 
 	// Create GUI instance
+	fyneApp := app.New()
+
 	gui := &GUI{
-		app:        app.New(),
+		app:        fyneApp,
 		logBuf:     logBuf,
 		config:     cfg,
 		configPath: configPath,
@@ -86,38 +90,44 @@ func RunGUI(configPath string) {
 
 	gui.setupTray()
 
-	// Create a hidden window (required for ShowAndRun)
-	w := gui.app.NewWindow("WhenIdle")
-	w.Resize(fyne.NewSize(1, 1))
-	w.SetCloseIntercept(func() {
-		w.Hide() // Hide instead of quit
+	// Hide from Dock after Fyne has fully started
+	gui.app.Lifecycle().SetOnStarted(func() {
+		HideFromDock()
 	})
 
-	w.ShowAndRun() // Blocks here (main thread event loop)
+	// Stop monitoring when app quits (e.g. via Fyne's built-in "Quit" menu item)
+	gui.app.Lifecycle().SetOnStopped(func() {
+		gui.stopMonitoring()
+		log.Println("[INFO] WhenIdle GUI stopped")
+	})
+
+	gui.app.Run() // Blocks here (main thread event loop, no window needed)
 }
 
 // setupTray configures the system tray menu.
 func (g *GUI) setupTray() {
-	if desk, ok := g.app.(desktop.App); ok {
-		menu := fyne.NewMenu("WhenIdle",
-			fyne.NewMenuItem("Enable Monitoring", func() {
-				g.toggleEnabled()
-			}),
-			fyne.NewMenuItemSeparator(),
-			fyne.NewMenuItem("Configure Task...", func() {
-				g.showConfigWindow()
-			}),
-			fyne.NewMenuItem("View Logs...", func() {
-				g.showLogsWindow()
-			}),
-			fyne.NewMenuItemSeparator(),
-			fyne.NewMenuItem("Quit", func() {
-				g.stopMonitoring()
-				g.app.Quit()
-			}),
-		)
-		desk.SetSystemTrayMenu(menu)
+	desk, ok := g.app.(desktop.App)
+	if !ok {
+		return
 	}
+	g.desk = desk
+
+	g.enableItem = fyne.NewMenuItem("Enable Monitoring", func() {
+		g.toggleEnabled()
+	})
+
+	menu := fyne.NewMenu("WhenIdle",
+		g.enableItem,
+		fyne.NewMenuItemSeparator(),
+		fyne.NewMenuItem("Configure Task...", func() {
+			g.showConfigWindow()
+		}),
+		fyne.NewMenuItem("View Logs...", func() {
+			g.showLogsWindow()
+		}),
+	)
+	desk.SetSystemTrayMenu(menu)
+	g.updateTrayIcon()
 }
 
 // toggleEnabled switches between enabled and disabled states.
@@ -129,6 +139,7 @@ func (g *GUI) toggleEnabled() {
 		g.startMonitoring()
 		log.Println("[INFO] Monitoring enabled via GUI")
 	}
+	g.updateTrayIcon()
 }
 
 // startMonitoring creates and starts the monitor and runner.
@@ -148,18 +159,45 @@ func (g *GUI) stopMonitoring() {
 		return
 	}
 
-	// Cancel monitor context
 	if g.cancelMon != nil {
 		g.cancelMon()
 	}
 
-	// Stop runner
 	if g.runner != nil {
 		g.runner.Stop()
 		g.runner.WaitDone()
 	}
 
 	g.enabled = false
+}
+
+// updateTrayIcon updates the system tray icon and menu label based on current state.
+func (g *GUI) updateTrayIcon() {
+	if g.desk == nil {
+		return
+	}
+
+	if !g.enabled {
+		g.desk.SetSystemTrayIcon(iconDisabled)
+		g.enableItem.Label = "Enable Monitoring"
+		g.enableItem.Checked = false
+	} else {
+		// Check task state for more granular icon
+		state := Stopped
+		if g.runner != nil {
+			state = g.runner.State()
+		}
+		switch state {
+		case Running:
+			g.desk.SetSystemTrayIcon(iconRunning)
+		case Paused:
+			g.desk.SetSystemTrayIcon(iconPaused)
+		default:
+			g.desk.SetSystemTrayIcon(iconIdle)
+		}
+		g.enableItem.Label = "Disable Monitoring"
+		g.enableItem.Checked = true
+	}
 }
 
 // showConfigWindow opens a dialog with the configuration form.
@@ -268,24 +306,21 @@ func (g *GUI) showLogsWindow() {
 	w := g.app.NewWindow("Logs")
 	w.Resize(fyne.NewSize(700, 500))
 
-	// Create multi-line entry (read-only)
-	logText := widget.NewMultiLineEntry()
-	logText.Disable()
+	// RichText is read-only by nature and displays with normal text colors
+	// (unlike a disabled MultiLineEntry which greys out text).
+	logText := widget.NewRichTextWithText(strings.Join(g.logBuf.Lines(), "\n"))
 	logText.Wrapping = fyne.TextWrapWord
 
-	// Populate with current logs
-	lines := g.logBuf.Lines()
-	logText.SetText(strings.Join(lines, "\n"))
+	scrolled := container.NewVScroll(logText)
 
-	scrolled := container.NewScroll(logText)
-
-	// Register onChange to update logs live
+	// Register onChange to update logs live.
+	// Update text segments directly (not ParseMarkdown, which merges single newlines).
 	g.logBuf.SetOnChange(func() {
-		// Must use fyne.Do since this is called from a goroutine
 		fyne.Do(func() {
-			lines := g.logBuf.Lines()
-			logText.SetText(strings.Join(lines, "\n"))
-			// Scroll to bottom
+			logText.Segments = []widget.RichTextSegment{
+				&widget.TextSegment{Text: strings.Join(g.logBuf.Lines(), "\n")},
+			}
+			logText.Refresh()
 			scrolled.ScrollToBottom()
 		})
 	})

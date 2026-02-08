@@ -8,6 +8,7 @@
     <key>ProgramArguments</key>
     <array>
         <string>__INSTALL_DIR__/whenidle</string>
+        <string>--gui</string>
         <string>--config</string>
         <string>__CONFIG_DIR__/config.json</string>
     </array>
