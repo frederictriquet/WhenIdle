@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.whenidle.agent</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>__INSTALL_DIR__/whenidle</string>
+        <string>--config</string>
+        <string>__CONFIG_DIR__/config.json</string>
+    </array>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/tmp/whenidle.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/whenidle.stderr.log</string>
+</dict>
+</plist>
