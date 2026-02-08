@@ -348,13 +348,37 @@ func (g *GUI) showLogsWindow() {
 	w.Show()
 }
 
-// splitArgs splits a string into arguments using whitespace as delimiter.
-// Simple implementation: doesn't handle quoted strings (e.g., "hello world").
-// For more advanced parsing, consider a shell parser library.
+// splitArgs splits a string into arguments, respecting double-quoted strings.
+// e.g., `foo "bar baz" qux` → ["foo", "bar baz", "qux"]
+// e.g., `ARGS="--limit 1"` → [`ARGS=--limit 1`]
 func splitArgs(s string) []string {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return nil
 	}
-	return strings.Fields(s)
+
+	var args []string
+	var current strings.Builder
+	inQuotes := false
+
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		switch {
+		case ch == '"':
+			inQuotes = !inQuotes
+		case ch == ' ' && !inQuotes:
+			if current.Len() > 0 {
+				args = append(args, current.String())
+				current.Reset()
+			}
+		default:
+			current.WriteByte(ch)
+		}
+	}
+
+	if current.Len() > 0 {
+		args = append(args, current.String())
+	}
+
+	return args
 }
