@@ -71,13 +71,20 @@ func (m *CPUMonitor) tick(checksNeeded int) {
 
 	if usage < m.config.CPUThreshold {
 		m.idleCount++
-		log.Printf("[INFO] CPU at %.1f%% - idle for %d/%d checks (task: %s)",
-			usage, m.idleCount, checksNeeded, state)
+
+		if state != Running {
+			log.Printf("[INFO] CPU at %.1f%% - idle for %d/%d checks (task: %s)",
+				usage, m.idleCount, checksNeeded, state)
+		}
 
 		if m.idleCount >= checksNeeded && !m.taskLaunched {
 			// First time reaching idle threshold: start or resume the task
 			m.taskLaunched = true
 			log.Println("[INFO] System is idle - triggering task")
+			m.onIdle()
+		} else if m.idleCount >= checksNeeded && m.taskLaunched && state == Stopped && m.config.Restart {
+			// Task finished and restart is enabled: re-trigger
+			log.Println("[INFO] Task finished, restarting")
 			m.onIdle()
 		} else if m.idleCount >= checksNeeded && state == Paused {
 			// Task was paused by a brief busy spike but we're idle again
@@ -88,7 +95,7 @@ func (m *CPUMonitor) tick(checksNeeded int) {
 		if state == Running {
 			log.Printf("[INFO] CPU at %.1f%% - system busy, pausing task", usage)
 			m.onBusy()
-		} else {
+		} else if state != Stopped || m.idleCount > 0 {
 			log.Printf("[INFO] CPU at %.1f%% - system busy", usage)
 		}
 		m.idleCount = 0

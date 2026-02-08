@@ -20,6 +20,7 @@ type Config struct {
 	Args          []string `json:"args"`
 	WorkingDir    string   `json:"working_dir"`
 	LogFile       string   `json:"log_file"`
+	Restart       bool     `json:"restart"`
 }
 
 func LoadConfig(path string) (Config, error) {

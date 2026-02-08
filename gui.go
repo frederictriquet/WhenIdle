@@ -244,6 +244,9 @@ func (g *GUI) showConfigWindow() {
 	checkIntervalEntry := widget.NewEntry()
 	checkIntervalEntry.SetText(fmt.Sprintf("%d", g.config.CheckInterval))
 
+	restartCheck := widget.NewCheck("", nil)
+	restartCheck.Checked = g.config.Restart
+
 	form := &widget.Form{
 		Items: []*widget.FormItem{
 			{Text: "Command", Widget: commandEntry, HintText: "Path to executable (e.g. /bin/echo)"},
@@ -252,6 +255,7 @@ func (g *GUI) showConfigWindow() {
 			{Text: "CPU Threshold (%)", Widget: thresholdEntry, HintText: "0-100, default 15.0"},
 			{Text: "Idle Duration (s)", Widget: idleDurationEntry, HintText: "Seconds, default 120"},
 			{Text: "Check Interval (s)", Widget: checkIntervalEntry, HintText: "Seconds, default 5"},
+			{Text: "Restart when done", Widget: restartCheck, HintText: "Re-launch task after completion"},
 		},
 		OnSubmit: func() {
 			// Parse numeric fields
@@ -280,6 +284,7 @@ func (g *GUI) showConfigWindow() {
 				CPUThreshold:  threshold,
 				IdleDuration:  idleDur,
 				CheckInterval: checkInt,
+				Restart:       restartCheck.Checked,
 			}
 
 			// Single source of truth for validation
