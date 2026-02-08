@@ -78,3 +78,17 @@ func (c Config) Validate() error {
 	}
 	return nil
 }
+
+// SaveConfig writes the config to the specified JSON file with pretty-printing.
+func SaveConfig(path string, cfg Config) error {
+	data, err := json.MarshalIndent(cfg, "", "    ")
+	if err != nil {
+		return fmt.Errorf("cannot marshal config: %w", err)
+	}
+
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("cannot write config file: %w", err)
+	}
+
+	return nil
+}
