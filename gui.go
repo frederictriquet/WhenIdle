@@ -359,22 +359,15 @@ func (g *GUI) showLogsWindow() {
 	w.Resize(fyne.NewSize(700, 500))
 	g.logsWindow = w
 
-	// RichText is read-only by nature and displays with normal text colors
-	// (unlike a disabled MultiLineEntry which greys out text).
-	logText := widget.NewRichTextWithText(strings.Join(g.logBuf.Lines(), "\n"))
+	logText := widget.NewMultiLineEntry()
+	logText.SetText(strings.Join(g.logBuf.Lines(), "\n"))
 	logText.Wrapping = fyne.TextWrapWord
 
-	scrolled := container.NewVScroll(logText)
-
 	// Register onChange to update logs live.
-	// Update text segments directly (not ParseMarkdown, which merges single newlines).
 	g.logBuf.SetOnChange(func() {
 		fyne.Do(func() {
-			logText.Segments = []widget.RichTextSegment{
-				&widget.TextSegment{Text: strings.Join(g.logBuf.Lines(), "\n")},
-			}
-			logText.Refresh()
-			scrolled.ScrollToBottom()
+			logText.SetText(strings.Join(g.logBuf.Lines(), "\n"))
+			logText.CursorRow = len(g.logBuf.Lines()) - 1
 		})
 	})
 
@@ -388,7 +381,7 @@ func (g *GUI) showLogsWindow() {
 	w.SetContent(container.NewBorder(
 		widget.NewLabel("Live Logs (last 500 lines)"),
 		nil, nil, nil,
-		scrolled,
+		logText,
 	))
 	w.Show()
 }

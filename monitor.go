@@ -107,8 +107,8 @@ func (m *Monitor) tick(checksNeeded int) {
 		if state == Running {
 			log.Printf("[INFO] %s - busy, pausing task", detail)
 			m.onBusy()
-		} else if state != Stopped || m.idleCount > 0 {
-			log.Printf("[INFO] %s - busy", detail)
+		} else if m.idleCount > 0 {
+			log.Printf("[INFO] %s - busy (was idle for %d checks)", detail, m.idleCount)
 		}
 		m.idleCount = 0
 		m.taskLaunched = false
