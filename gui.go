@@ -193,8 +193,7 @@ func (g *GUI) updateTrayIcon() {
 
 	if !g.enabled {
 		g.desk.SetSystemTrayIcon(iconDisabled)
-		g.enableItem.Label = "Enable Monitoring"
-		g.enableItem.Checked = false
+		g.enableItem.Label = "⏸ Enable Monitoring"
 	} else {
 		// Check task state for more granular icon
 		state := Stopped
@@ -209,8 +208,7 @@ func (g *GUI) updateTrayIcon() {
 		default:
 			g.desk.SetSystemTrayIcon(iconIdle)
 		}
-		g.enableItem.Label = "Disable Monitoring"
-		g.enableItem.Checked = true
+		g.enableItem.Label = "▶ Disable Monitoring"
 	}
 	g.trayMenu.Refresh()
 }
