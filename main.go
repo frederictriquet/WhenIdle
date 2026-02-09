@@ -49,7 +49,7 @@ func main() {
 	log.Printf("[INFO] Task: %s %v (workdir: %s)", cfg.Command, cfg.Args, cfg.WorkingDir)
 
 	runner := NewTaskRunner(cfg)
-	monitor := NewCPUMonitor(cfg, runner.OnIdle, runner.OnBusy, runner.State)
+	monitor := NewMonitor(cfg, runner.OnIdle, runner.OnBusy, runner.State)
 
 	// Start monitoring in background
 	ctx, cancel := context.WithCancel(context.Background())

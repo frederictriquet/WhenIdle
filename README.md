@@ -21,6 +21,9 @@ WhenIdle est un daemon macOS léger qui surveille l'utilisation CPU de votre sys
 
 ### Comportement
 
+WhenIdle supporte **deux modes** de détection d'inactivité :
+
+#### Mode CPU (par défaut)
 ```
 CPU idle (< seuil) pendant N secondes → Lance la tâche
 CPU actif (> seuil) → Suspend la tâche (SIGSTOP)
@@ -28,10 +31,22 @@ CPU redevient idle → Reprend la tâche (SIGCONT)
 Arrêt du daemon → Termine proprement la tâche (SIGTERM/SIGKILL)
 ```
 
+#### Mode User Idle (nouveau)
+```
+Aucun événement clavier/souris pendant N secondes → Lance la tâche
+Événement clavier/souris détecté → Suspend la tâche (SIGSTOP)
+Inactivité retrouvée (N secondes) → Reprend la tâche (SIGCONT)
+Arrêt du daemon → Termine proprement la tâche (SIGTERM/SIGKILL)
+```
+
+**Note** : En mode User Idle, le seuil CPU est ignoré. La détection utilise `CGEventSourceSecondsSinceLastEventType` (macOS Quartz Event Services) et ne nécessite aucune permission d'accessibilité.
+
 ## Fonctionnalités
 
 - ✅ **Interface graphique (GUI)** dans la barre de menu macOS (system tray)
+- ✅ **Deux modes de détection d'inactivité** : CPU-based ou User Input-based
 - ✅ **Surveillance CPU en temps réel** avec seuil configurable
+- ✅ **Détection d'inactivité utilisateur** (clavier/souris) sans permissions additionnelles
 - ✅ **Suspension/reprise automatique** via SIGSTOP/SIGCONT
 - ✅ **Process group signaling** pour gérer toute l'arborescence de processus
 - ✅ **Launch Agent macOS** pour démarrage automatique au login
@@ -102,29 +117,52 @@ Le fichier de configuration est au format JSON.
 
 | Option | Type | Défaut | Description |
 |--------|------|--------|-------------|
-| `cpu_threshold` | float | 15.0 | % CPU global en dessous duquel le système est considéré idle (0-100) |
+| `idle_mode` | string | `"cpu"` | Mode de détection : `"cpu"` (CPU-based) ou `"user_idle"` (clavier/souris) |
+| `cpu_threshold` | float | 15.0 | % CPU global en dessous duquel le système est considéré idle (0-100) — **ignoré en mode `user_idle`** |
 | `idle_duration` | int | 120 | Nombre de secondes consécutives d'idle avant de lancer la tâche |
-| `check_interval` | int | 5 | Intervalle de vérification CPU en secondes |
+| `check_interval` | int | 5 | Intervalle de vérification en secondes |
 | `command` | string | **requis** | Chemin complet de la commande à exécuter |
 | `args` | []string | [] | Arguments à passer à la commande |
 | `working_dir` | string | **requis** | Répertoire de travail pour la commande |
 | `log_file` | string | "" | Fichier de log optionnel (vide = stdout) |
+| `restart` | bool | false | Redémarre la tâche automatiquement après sa complétion |
 
 ### Exemple de configuration
 
+#### Mode CPU (par défaut)
 ```json
 {
+    "idle_mode": "cpu",
     "cpu_threshold": 15.0,
     "idle_duration": 120,
     "check_interval": 5,
     "command": "/usr/local/bin/heavy-task",
     "args": ["--option1", "value1"],
     "working_dir": "/Users/fred/projects/heavy-task",
-    "log_file": "/tmp/whenidle.log"
+    "log_file": "/tmp/whenidle.log",
+    "restart": false
 }
 ```
 
+#### Mode User Idle (clavier/souris)
+```json
+{
+    "idle_mode": "user_idle",
+    "idle_duration": 300,
+    "check_interval": 5,
+    "command": "/usr/local/bin/heavy-task",
+    "args": ["--option1", "value1"],
+    "working_dir": "/Users/fred/projects/heavy-task",
+    "log_file": "/tmp/whenidle.log",
+    "restart": false
+}
+```
+
+**Note** : En mode `user_idle`, le champ `cpu_threshold` est ignoré.
+
 ### Calcul de l'idle
+
+#### Mode CPU
 
 Le nombre de vérifications nécessaires est calculé automatiquement :
 
@@ -133,6 +171,10 @@ checks_needed = idle_duration / check_interval
 ```
 
 Exemple : avec `idle_duration=120` et `check_interval=5`, la tâche se lance après **24 vérifications consécutives** à CPU < seuil (soit 2 minutes).
+
+#### Mode User Idle
+
+La détection est immédiate car `CGEventSourceSecondsSinceLastEventType` retourne directement les secondes écoulées depuis le dernier événement clavier/souris. Le monitor vérifie cette valeur toutes les `check_interval` secondes et lance la tâche si elle dépasse `idle_duration`.
 
 ## Utilisation
 
@@ -163,7 +205,12 @@ Une icône apparaît dans votre barre de menu avec les couleurs suivantes :
 
 1. Cliquez sur l'icône dans la barre de menu
 2. Sélectionnez **"Configure Task..."**
-3. Modifiez les paramètres dans le formulaire
+3. Modifiez les paramètres dans le formulaire :
+   - **Idle Mode** : Choisissez "CPU Activity" ou "User Activity"
+   - **CPU Threshold** : Seuil CPU (ignoré en mode User Activity)
+   - **Idle Duration** : Secondes d'inactivité avant de lancer la tâche
+   - **Check Interval** : Fréquence de vérification
+   - **Restart when done** : Relancer automatiquement la tâche après complétion
 4. Cliquez **"Save"**
 5. Si le monitoring est actif, il redémarre automatiquement avec la nouvelle config
 
@@ -256,6 +303,22 @@ Lance l'encodage ffmpeg après 5 minutes d'inactivité (CPU < 15%), vérifie tou
 ```
 
 Exécute un script shell simple qui log la date.
+
+### Exemple 4 : Mode User Idle pour tâche nocturne
+
+```json
+{
+    "idle_mode": "user_idle",
+    "idle_duration": 600,
+    "check_interval": 10,
+    "command": "/usr/local/bin/backup-script",
+    "args": ["--full"],
+    "working_dir": "/Users/fred/backup",
+    "restart": false
+}
+```
+
+Lance un backup complet après 10 minutes sans activité clavier/souris (ex: la nuit). Ignore l'utilisation CPU, donc la tâche se lance même si d'autres processus consomment du CPU.
 
 ## Désinstallation
 
@@ -354,10 +417,12 @@ rm -rf ~/.config/whenidle
 | `icon.go` | Génération programmatique des icônes tray |
 | `dock_darwin.go` | CGo pour cacher l'app du Dock macOS |
 | `dock_other.go` | Stub no-op pour plateformes non-Darwin |
-| `config.go` | Chargement, sauvegarde et validation JSON |
-| `monitor.go` | Surveillance CPU avec boucle de polling |
+| `config.go` | Chargement, sauvegarde et validation JSON (IdleMode) |
+| `monitor.go` | Surveillance idle avec stratégie pluggable (CPU ou User Idle) |
+| `user_idle_darwin.go` | CGo wrapper pour `CGEventSourceSecondsSinceLastEventType` |
+| `user_idle_other.go` | Stub non-Darwin pour `UserIdleSeconds()` |
 | `runner.go` | Gestion du processus (exec, SIGSTOP/SIGCONT/SIGTERM) |
-| `*_test.go` | Tests unitaires (24 tests) |
+| `*_test.go` | Tests unitaires (33 tests) |
 
 ## Développement
 
@@ -399,10 +464,12 @@ go test -v -cover ./...
 ├── icon.go                   # Génération icônes tray
 ├── dock_darwin.go            # CGo pour cacher du Dock
 ├── dock_other.go             # Stub non-Darwin
-├── config.go                 # Config JSON (load/save)
+├── config.go                 # Config JSON (load/save, idle_mode)
 ├── config_test.go            # Tests config
-├── monitor.go                # Surveillance CPU
-├── monitor_test.go           # Tests monitor
+├── monitor.go                # Surveillance idle (stratégie pluggable)
+├── monitor_test.go           # Tests monitor (CPU + User Idle)
+├── user_idle_darwin.go       # CGo CoreGraphics (User Idle)
+├── user_idle_other.go        # Stub non-Darwin
 ├── runner.go                 # Gestion processus
 ├── runner_test.go            # Tests runner
 ├── config.example.json       # Config par défaut
@@ -414,19 +481,21 @@ go test -v -cover ./...
 
 ### Tests
 
-Le projet inclut 24 tests unitaires couvrant :
-- Validation de la configuration (save/load round-trip)
+Le projet inclut 33 tests unitaires couvrant :
+- Validation de la configuration (save/load round-trip, idle_mode)
 - LogBuffer (ring buffer, thread safety, onChange callbacks)
 - Machine à états du runner (Stopped → Running → Paused)
-- Logique de détection idle/busy du monitor
+- Logique de détection idle/busy du monitor (CPU et User Idle)
 - Signaling SIGSTOP/SIGCONT/SIGTERM
+- Mode User Idle (détection et pause)
 
-Couverture : ~65%
+Couverture : ~43%
 
 ### Dépendances
 
 - `github.com/shirou/gopsutil/v4` — Monitoring CPU cross-platform
 - `fyne.io/fyne/v2` — Framework GUI et system tray (v2.7.2)
+- **CGo** — Requis pour Cocoa (Dock), CoreGraphics (User Idle), et Fyne
 
 ## FAQ
 

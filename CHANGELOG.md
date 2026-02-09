@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-02-09
+
+### Added
+- **Mode User Idle** : Détection d'inactivité basée sur l'absence d'événements clavier/souris
+  - Utilise `CGEventSourceSecondsSinceLastEventType` (macOS Quartz Event Services)
+  - Aucune permission d'accessibilité requise
+  - Nouvelle option de configuration : `idle_mode` (`"cpu"` ou `"user_idle"`)
+- **Radio button dans la GUI** pour sélectionner le mode de détection (CPU Activity / User Activity)
+- **Option `restart`** : Relance automatiquement la tâche après sa complétion
+- **Réduction du bruit dans les logs** : Suppression des messages CPU répétitifs lorsque la tâche tourne
+- Fichier `user_idle_darwin.go` : Wrapper CGo pour CoreGraphics
+- Fichier `user_idle_other.go` : Stub pour plateformes non-macOS
+
+### Changed
+- Refactoring : `CPUMonitor` renommé en `Monitor` (plus générique)
+- Architecture : Stratégie pluggable via `checkIdle func() (idle bool, detail string)`
+- En mode `user_idle`, `checksNeeded = 1` car la durée est mesurée directement par l'API système
+- Fenêtres de configuration et logs réutilisées (singleton pattern) au lieu de dupliquer
+- 33 tests au lieu de 24 (ajout tests `IdleMode` et User Idle)
+- Couverture de tests : ~43% (ajout code CGo non couvert)
+
+### Fixed
+- **Singleton windows** : Les fenêtres "Configure Task" et "View Logs" ne se dupliquent plus
+- **PATH pour Launch Agent** : Résolution via le shell de l'utilisateur (`$SHELL`) au lieu de `/bin/bash`
+  - Permet de trouver `npm`, `node` (nvm), et autres outils installés via homebrew/nvm
+
+### Technical Details
+- Nouveau type `IdleMode` avec validation stricte
+- Build constraint `//go:build darwin` pour `user_idle_darwin.go`
+- LDFLAGS : `-framework CoreGraphics` ajouté pour User Idle
+- Mode CPU préserve le comportement existant (rétro-compatible)
+
 ## [1.1.0] - 2026-02-08
 
 ### Added
@@ -61,6 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Memory footprint: ~5-10 MB at runtime
 - Non-blocking CPU measurement (0 second interval)
 
-[Unreleased]: https://github.com/user/whenidle/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/user/whenidle/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/user/whenidle/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/user/whenidle/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/user/whenidle/releases/tag/v1.0.0

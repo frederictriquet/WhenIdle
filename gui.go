@@ -25,13 +25,14 @@ type GUI struct {
 	app        fyne.App
 	desk       desktop.App
 	runner     *TaskRunner
-	monitor    *CPUMonitor
+	monitor    *Monitor
 	logBuf     *LogBuffer
 	config     Config
 	configPath string
 
 	enabled    bool
 	enableItem *fyne.MenuItem
+	trayMenu   *fyne.Menu
 	cancelMon  context.CancelFunc
 	monCtx     context.Context
 
@@ -119,7 +120,7 @@ func (g *GUI) setupTray() {
 		g.toggleEnabled()
 	})
 
-	menu := fyne.NewMenu("WhenIdle",
+	g.trayMenu = fyne.NewMenu("WhenIdle",
 		g.enableItem,
 		fyne.NewMenuItemSeparator(),
 		fyne.NewMenuItem("Configure Task...", func() {
@@ -129,7 +130,7 @@ func (g *GUI) setupTray() {
 			g.showLogsWindow()
 		}),
 	)
-	desk.SetSystemTrayMenu(menu)
+	desk.SetSystemTrayMenu(g.trayMenu)
 	g.updateTrayIcon()
 }
 
@@ -158,7 +159,7 @@ func (g *GUI) startMonitoring() {
 		g.runner.OnBusy()
 		fyne.Do(func() { g.updateTrayIcon() })
 	}
-	g.monitor = NewCPUMonitor(g.config, onIdle, onBusy, g.runner.State)
+	g.monitor = NewMonitor(g.config, onIdle, onBusy, g.runner.State)
 
 	g.monCtx, g.cancelMon = context.WithCancel(context.Background())
 	go g.monitor.Start(g.monCtx)
@@ -211,6 +212,7 @@ func (g *GUI) updateTrayIcon() {
 		g.enableItem.Label = "Disable Monitoring"
 		g.enableItem.Checked = true
 	}
+	g.trayMenu.Refresh()
 }
 
 // showConfigWindow opens a dialog with the configuration form, or brings an existing one to front.
@@ -235,6 +237,14 @@ func (g *GUI) showConfigWindow() {
 	workdirEntry := widget.NewEntry()
 	workdirEntry.SetText(g.config.WorkingDir)
 
+	idleModeRadio := widget.NewRadioGroup([]string{"CPU Activity", "User Activity"}, nil)
+	if g.config.IdleMode == IdleModeUserIdle {
+		idleModeRadio.SetSelected("User Activity")
+	} else {
+		idleModeRadio.SetSelected("CPU Activity")
+	}
+	idleModeRadio.Horizontal = true
+
 	thresholdEntry := widget.NewEntry()
 	thresholdEntry.SetText(fmt.Sprintf("%.1f", g.config.CPUThreshold))
 
@@ -249,10 +259,11 @@ func (g *GUI) showConfigWindow() {
 
 	form := &widget.Form{
 		Items: []*widget.FormItem{
+			{Text: "Idle Mode", Widget: idleModeRadio, HintText: "What triggers the task"},
 			{Text: "Command", Widget: commandEntry, HintText: "Path to executable (e.g. /bin/echo)"},
 			{Text: "Arguments", Widget: argsEntry, HintText: "Space-separated arguments"},
 			{Text: "Working Directory", Widget: workdirEntry, HintText: "Leave empty for current dir"},
-			{Text: "CPU Threshold (%)", Widget: thresholdEntry, HintText: "0-100, default 15.0"},
+			{Text: "CPU Threshold (%)", Widget: thresholdEntry, HintText: "Only for CPU mode"},
 			{Text: "Idle Duration (s)", Widget: idleDurationEntry, HintText: "Seconds, default 120"},
 			{Text: "Check Interval (s)", Widget: checkIntervalEntry, HintText: "Seconds, default 5"},
 			{Text: "Restart when done", Widget: restartCheck, HintText: "Re-launch task after completion"},
@@ -277,6 +288,11 @@ func (g *GUI) showConfigWindow() {
 				return
 			}
 
+			idleMode := IdleModeCPU
+			if idleModeRadio.Selected == "User Activity" {
+				idleMode = IdleModeUserIdle
+			}
+
 			newCfg := Config{
 				Command:       commandEntry.Text,
 				Args:          splitArgs(argsEntry.Text),
@@ -285,6 +301,7 @@ func (g *GUI) showConfigWindow() {
 				IdleDuration:  idleDur,
 				CheckInterval: checkInt,
 				Restart:       restartCheck.Checked,
+				IdleMode:      idleMode,
 			}
 
 			// Single source of truth for validation
