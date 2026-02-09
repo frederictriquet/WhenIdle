@@ -32,6 +32,7 @@ type GUI struct {
 
 	enabled    bool
 	enableItem *fyne.MenuItem
+	trayMenu   *fyne.Menu
 	cancelMon  context.CancelFunc
 	monCtx     context.Context
 
@@ -119,7 +120,7 @@ func (g *GUI) setupTray() {
 		g.toggleEnabled()
 	})
 
-	menu := fyne.NewMenu("WhenIdle",
+	g.trayMenu = fyne.NewMenu("WhenIdle",
 		g.enableItem,
 		fyne.NewMenuItemSeparator(),
 		fyne.NewMenuItem("Configure Task...", func() {
@@ -129,7 +130,7 @@ func (g *GUI) setupTray() {
 			g.showLogsWindow()
 		}),
 	)
-	desk.SetSystemTrayMenu(menu)
+	desk.SetSystemTrayMenu(g.trayMenu)
 	g.updateTrayIcon()
 }
 
@@ -211,6 +212,7 @@ func (g *GUI) updateTrayIcon() {
 		g.enableItem.Label = "Disable Monitoring"
 		g.enableItem.Checked = true
 	}
+	g.trayMenu.Refresh()
 }
 
 // showConfigWindow opens a dialog with the configuration form, or brings an existing one to front.
