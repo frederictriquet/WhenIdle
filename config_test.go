@@ -181,3 +181,71 @@ func TestSaveConfigInvalidPath(t *testing.T) {
 		t.Error("Expected error when saving to non-existent directory")
 	}
 }
+
+func TestIdleModeDefault(t *testing.T) {
+	tmpdir := t.TempDir()
+	configPath := filepath.Join(tmpdir, "config.json")
+
+	// Config without idle_mode should default to "cpu"
+	configContent := `{
+		"command": "/bin/echo",
+		"working_dir": "/tmp"
+	}`
+
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to write temp config: %v", err)
+	}
+
+	cfg, err := LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	if cfg.IdleMode != IdleModeCPU {
+		t.Errorf("Expected default IdleMode %q, got %q", IdleModeCPU, cfg.IdleMode)
+	}
+}
+
+func TestIdleModeUserIdle(t *testing.T) {
+	tmpdir := t.TempDir()
+	configPath := filepath.Join(tmpdir, "config.json")
+
+	configContent := `{
+		"command": "/bin/echo",
+		"working_dir": "/tmp",
+		"idle_mode": "user_idle"
+	}`
+
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to write temp config: %v", err)
+	}
+
+	cfg, err := LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	if cfg.IdleMode != IdleModeUserIdle {
+		t.Errorf("Expected IdleMode %q, got %q", IdleModeUserIdle, cfg.IdleMode)
+	}
+}
+
+func TestIdleModeInvalid(t *testing.T) {
+	tmpdir := t.TempDir()
+	configPath := filepath.Join(tmpdir, "config.json")
+
+	configContent := `{
+		"command": "/bin/echo",
+		"working_dir": "/tmp",
+		"idle_mode": "invalid_mode"
+	}`
+
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to write temp config: %v", err)
+	}
+
+	_, err := LoadConfig(configPath)
+	if err == nil {
+		t.Error("Expected validation error for invalid idle_mode")
+	}
+}

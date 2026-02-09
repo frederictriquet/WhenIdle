@@ -46,6 +46,43 @@
 
 ---
 
+## v1.2.0 (In Development)
+
+### Idle Detection Modes
+- [x] Mode CPU: Detection based on CPU usage threshold (v1.0 behavior)
+- [x] Mode User Idle: Detection based on keyboard/mouse inactivity
+  - Uses CGEventSourceSecondsSinceLastEventType (Quartz Event Services)
+  - No accessibility permissions required
+  - macOS-only (stub for other platforms)
+- [x] Configuration option: `idle_mode` (cpu | user_idle)
+- [x] GUI radio button to select idle mode
+- [x] Option `restart`: Auto-restart task after completion
+
+### Bug Fixes
+- [x] Singleton windows: Config and Logs windows no longer duplicate
+- [x] PATH resolution: Launch Agent now finds npm/nvm via login shell
+- [x] Log noise reduction: CPU logs suppressed when task is running
+
+### Quality
+- [x] Unit tests: 33 passing (43% coverage, CGo uncovered)
+- [x] Code review completed: APPROVED
+- [x] Documentation: README, CHANGELOG, inline comments updated
+- [x] Capitalisation: ADR-003, pattern-pluggable-strategy.md, learnings documented
+
+**Status**: ✅ DONE (Feature implementation complete)
+**Completed**: 2026-02-09
+**Branch**: feature/idle-detection-mode
+**Commits**: 8 commits (relative to v1.1.0)
+
+**Development Metrics**:
+- Duration: ~1 session
+- Files modified: 6 (config, monitor, gui, main, runner, tests)
+- Files added: 4 (user_idle_darwin.go, user_idle_other.go, 2 doc files)
+- Tests added: 9 (34 → 33 total, some refactored)
+- Capitalisation: 3 files (.claude/)
+
+---
+
 ## v2.0.0 (Planned - Long-term)
 
 ### Major Features
@@ -54,6 +91,7 @@
 - [ ] Task priority and queueing
 - [ ] Advanced resource limits (CPU%, memory%)
 - [ ] Checkpoint/restore support
+- [ ] Linux support (User Idle via X11)
 
 ---
 
@@ -88,13 +126,13 @@ Initial release
 - Docs: Full README, CHANGELOG, inline comments
 - Status: Ready for production
 
-### v1.1.0 - 2026-02-08 (In Development)
+### v1.1.0 - 2026-02-08
 GUI enhancement release
 - Feature: System tray GUI with config editor, log viewer
 - Quality: 24 unit tests passing (65% coverage)
 - Architecture: Fyne.io, LogBuffer ring buffer, HideFromDock CGo
 - Docs: Updated README, CHANGELOG, ADR-002, learnings documented
-- Status: Ready for code review and merge
+- Status: Released and merged
 
 **Development Metrics**:
 - Duration: ~9-10 hours
@@ -102,12 +140,30 @@ GUI enhancement release
 - Commits: 6 (320a21e → 64c0183)
 - Branch: feature/gui-system-tray
 
+### v1.2.0 - 2026-02-09
+Idle detection modes release
+- Feature: CPU mode + User Idle mode (keyboard/mouse detection)
+- Quality: 33 unit tests passing (43% coverage, CGo not covered)
+- Architecture: Pluggable strategy pattern, refactored Monitor
+- Fixes: Singleton windows, PATH resolution, log noise
+- Docs: README updated, CHANGELOG, ADR-003, learnings documented
+- Status: Ready for code review and merge
+
+**Development Metrics**:
+- Duration: ~1 session
+- Files modified: 6 (config, monitor, gui, main, runner, tests)
+- Files added: 4 (user_idle_darwin.go, user_idle_other.go, + docs)
+- Tests added: 9 (refactored)
+- Capitalisation: 3 files (.claude/)
+- Branch: feature/idle-detection-mode
+
 ---
 
-## Next Steps (Post-v1.1.0)
+## Next Steps (Post-v1.2.0)
 
-- [ ] Code review approval → Merge to main
-- [ ] User feedback collection on GUI
-- [ ] Performance monitoring in production
-- [ ] Plan v1.2 features based on feedback
+- [ ] Create PR for feature/idle-detection-mode
+- [ ] Merge feature/idle-detection-mode to main
+- [ ] Tag release v1.2.0
+- [ ] User feedback collection on idle modes
+- [ ] Plan v1.3 features based on feedback (multiple tasks, metrics, etc.)
 - [ ] Consider Linux support for v2.0

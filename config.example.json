@@ -1,9 +1,11 @@
 {
+    "idle_mode": "cpu",
     "cpu_threshold": 15.0,
     "idle_duration": 120,
     "check_interval": 5,
     "command": "/usr/local/bin/my-heavy-task",
     "args": ["--flag1", "value1"],
     "working_dir": "/tmp",
-    "log_file": ""
+    "log_file": "",
+    "restart": false
 }
