@@ -46,24 +46,24 @@ func NewMonitor(config Config, onIdle func(), onBusy func(), getState func() Tas
 }
 
 func (m *Monitor) Start(ctx context.Context) {
-	checksNeeded := m.config.IdleDuration / m.config.CheckInterval
-	if checksNeeded < 1 {
-		checksNeeded = 1
-	}
-
-	ticker := time.NewTicker(time.Duration(m.config.CheckInterval) * time.Second)
-	defer ticker.Stop()
-
+	var checksNeeded int
 	if m.config.IdleMode == IdleModeUserIdle {
-		checksNeeded = 1 // UserIdleSeconds already measures duration
+		checksNeeded = 1 // UserIdleSeconds already measures cumulative duration
 		log.Printf("[INFO] Monitor started: user idle mode, idle after %ds, polling every %ds",
 			m.config.IdleDuration, m.config.CheckInterval)
 	} else {
+		checksNeeded = m.config.IdleDuration / m.config.CheckInterval
+		if checksNeeded < 1 {
+			checksNeeded = 1
+		}
 		// Prime the CPU measurement so subsequent calls with interval=0 return meaningful values
 		_, _ = cpu.Percent(0, false)
 		log.Printf("[INFO] Monitor started: CPU mode, threshold=%.1f%%, idle after %ds (%d checks), polling every %ds",
 			m.config.CPUThreshold, m.config.IdleDuration, checksNeeded, m.config.CheckInterval)
 	}
+
+	ticker := time.NewTicker(time.Duration(m.config.CheckInterval) * time.Second)
+	defer ticker.Stop()
 
 	for {
 		select {
@@ -89,16 +89,19 @@ func (m *Monitor) tick(checksNeeded int) {
 				detail, m.idleCount, checksNeeded, state)
 		}
 
-		if m.idleCount >= checksNeeded && !m.taskLaunched {
-			m.taskLaunched = true
-			log.Println("[INFO] System is idle - triggering task")
-			m.onIdle()
-		} else if m.idleCount >= checksNeeded && m.taskLaunched && state == Stopped && m.config.Restart {
-			log.Println("[INFO] Task finished, restarting")
-			m.onIdle()
-		} else if m.idleCount >= checksNeeded && state == Paused {
-			log.Println("[INFO] System is idle again - resuming task")
-			m.onIdle()
+		if m.idleCount >= checksNeeded {
+			switch {
+			case !m.taskLaunched:
+				m.taskLaunched = true
+				log.Println("[INFO] System is idle - triggering task")
+				m.onIdle()
+			case state == Stopped && m.config.Restart:
+				log.Println("[INFO] Task finished, restarting")
+				m.onIdle()
+			case state == Paused:
+				log.Println("[INFO] System is idle again - resuming task")
+				m.onIdle()
+			}
 		}
 	} else {
 		if state == Running {

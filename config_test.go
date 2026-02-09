@@ -131,13 +131,15 @@ func TestSaveConfig(t *testing.T) {
 	configPath := filepath.Join(tmpdir, "config.json")
 
 	cfg := Config{
-		CPUThreshold: 25.5,
-		IdleDuration: 90,
+		CPUThreshold:  25.5,
+		IdleDuration:  90,
 		CheckInterval: 10,
-		Command: "/bin/sleep",
-		Args: []string{"60"},
-		WorkingDir: "/tmp",
-		LogFile: "/tmp/test.log",
+		Command:       "/bin/sleep",
+		Args:          []string{"60"},
+		WorkingDir:    "/tmp",
+		LogFile:       "/tmp/test.log",
+		IdleMode:      IdleModeUserIdle,
+		Restart:       true,
 	}
 
 	// Save config
@@ -164,6 +166,12 @@ func TestSaveConfig(t *testing.T) {
 	}
 	if loaded.Command != cfg.Command {
 		t.Errorf("Command mismatch: expected %q, got %q", cfg.Command, loaded.Command)
+	}
+	if loaded.IdleMode != cfg.IdleMode {
+		t.Errorf("IdleMode mismatch: expected %q, got %q", cfg.IdleMode, loaded.IdleMode)
+	}
+	if loaded.Restart != cfg.Restart {
+		t.Errorf("Restart mismatch: expected %v, got %v", cfg.Restart, loaded.Restart)
 	}
 }
 
