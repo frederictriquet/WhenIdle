@@ -378,9 +378,13 @@ func (g *GUI) showLogsWindow() {
 		w.Close()
 	})
 
+	clearBtn := widget.NewButton("Clear", func() {
+		g.logBuf.Clear()
+	})
+
 	w.SetContent(container.NewBorder(
 		widget.NewLabel("Live Logs (last 500 lines)"),
-		nil, nil, nil,
+		clearBtn, nil, nil,
 		logText,
 	))
 	w.Show()

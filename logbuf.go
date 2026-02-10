@@ -71,6 +71,18 @@ func (b *LogBuffer) Lines() []string {
 	return result
 }
 
+// Clear removes all buffered log lines and notifies the listener.
+func (b *LogBuffer) Clear() {
+	b.mu.Lock()
+	b.lines = b.lines[:0]
+	onChange := b.onChange
+	b.mu.Unlock()
+
+	if onChange != nil {
+		onChange()
+	}
+}
+
 // SetOnChange registers a callback invoked when new log lines arrive.
 // The callback is called synchronously from the writing goroutine (after
 // releasing the lock), so it should not block for long. Pass nil to unregister.
