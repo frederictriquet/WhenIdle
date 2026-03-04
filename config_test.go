@@ -151,6 +151,7 @@ func TestValidateNoCommand(t *testing.T) {
 		CPUThreshold:  20.0,
 		IdleDuration:  60,
 		CheckInterval: 5,
+		IdleMode:      IdleModeCPU,
 		Command:       "",
 		WorkingDir:    "/tmp",
 	}
@@ -165,6 +166,7 @@ func TestValidateInvalidWorkingDir(t *testing.T) {
 		CPUThreshold:  20.0,
 		IdleDuration:  60,
 		CheckInterval: 5,
+		IdleMode:      IdleModeCPU,
 		Command:       "/bin/echo",
 		WorkingDir:    "/nonexistent/path/that/should/not/exist",
 	}

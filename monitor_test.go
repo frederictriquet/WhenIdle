@@ -95,6 +95,29 @@ func TestMonitorContextCancel(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 }
 
+func TestMonitorStartUserIdleMode(t *testing.T) {
+	cfg := Config{
+		IdleMode:      IdleModeUserIdle,
+		IdleDuration:  9999,
+		CheckInterval: 1,
+		CPUThreshold:  15,
+	}
+
+	onIdle := func() {}
+	onBusy := func() {}
+	getState := func() TaskState { return Stopped }
+
+	monitor := NewMonitor(cfg, onIdle, onBusy, getState)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go monitor.Start(ctx)
+	time.Sleep(100 * time.Millisecond)
+	cancel()
+	time.Sleep(100 * time.Millisecond)
+}
+
 func TestMonitorTaskLaunchedFlag(t *testing.T) {
 	cfg := Config{
 		CPUThreshold:  50.0,
