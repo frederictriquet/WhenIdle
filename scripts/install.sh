@@ -50,7 +50,7 @@ chmod +x "$HOME/.local/bin/whenidle"
 # Install config (only if not already present)
 mkdir -p "$CONFIG_DIR"
 if [ ! -f "$CONFIG_DIR/config.json" ]; then
-    cp config.example.json "$CONFIG_DIR/config.json"
+    cp "$(dirname "$0")/config.example.json" "$CONFIG_DIR/config.json"
     echo "Config created at $CONFIG_DIR/config.json"
     echo ">>> EDIT THIS FILE or configure via the menu bar icon <<<"
 else

@@ -72,7 +72,7 @@ Arrêt du daemon → Termine proprement la tâche (SIGTERM/SIGKILL)
 
 ```bash
 cd /path/to/WhenIdle
-./install.sh
+./scripts/install.sh
 ```
 
 Cette commande :
@@ -97,7 +97,7 @@ chmod +x ~/.local/bin/whenidle
 
 # 3. Créer la configuration
 mkdir -p ~/.config/whenidle
-cp config.example.json ~/.config/whenidle/config.json
+cp scripts/config.example.json ~/.config/whenidle/config.json
 
 # 4. Éditer la configuration (voir section Configuration)
 nano ~/.config/whenidle/config.json
@@ -327,7 +327,7 @@ Lance un backup complet après 10 minutes sans activité clavier/souris (ex: la 
 ## Désinstallation
 
 ```bash
-./uninstall.sh
+./scripts/uninstall.sh
 ```
 
 Cette commande :
@@ -476,10 +476,11 @@ go test -v -cover ./...
 ├── user_idle_other.go        # Stub non-Darwin
 ├── runner.go                 # Gestion processus
 ├── runner_test.go            # Tests runner
-├── config.example.json       # Config par défaut
-├── install.sh                # Installation + .app bundle
-├── uninstall.sh              # Désinstallation
-├── com.whenidle.agent.plist  # Template Launch Agent
+├── scripts/
+│   ├── install.sh                # Installation + .app bundle
+│   ├── uninstall.sh              # Désinstallation
+│   ├── com.whenidle.agent.plist  # Template Launch Agent
+│   └── config.example.json       # Config par défaut
 └── README.md                 # Cette documentation
 ```
 
@@ -539,7 +540,7 @@ Vérifiez :
 
 ### Q: L'app apparaît dans le Dock au lieu de la barre de menu ?
 
-Le bundle `.app` doit avoir `LSUIElement=true` dans `Info.plist`. Ré-exécutez `./install.sh`.
+Le bundle `.app` doit avoir `LSUIElement=true` dans `Info.plist`. Ré-exécutez `./scripts/install.sh`.
 
 ## License
 
