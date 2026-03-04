@@ -27,15 +27,13 @@ func TestMonitorIdleDetection(t *testing.T) {
 
 	monitor := NewMonitor(cfg, onIdle, onBusy, getState)
 
-	// Mock checkIdle to return idle
 	monitor.checkIdle = func() (bool, string) {
 		return true, "CPU at 20.0%"
 	}
 
-	// Simulate ticks until idle is triggered
-	monitor.tick(3) // idleCount = 1
-	monitor.tick(3) // idleCount = 2
-	monitor.tick(3) // idleCount = 3, should trigger idle
+	monitor.tick(3)
+	monitor.tick(3)
+	monitor.tick(3)
 
 	if !idleTriggered {
 		t.Error("Expected OnIdle to be triggered after 3+ checks")
@@ -63,7 +61,6 @@ func TestMonitorBusyDetection(t *testing.T) {
 
 	monitor := NewMonitor(cfg, onIdle, onBusy, getState)
 
-	// Mock checkIdle to return busy
 	monitor.checkIdle = func() (bool, string) {
 		return false, "CPU at 80.0%"
 	}
@@ -115,12 +112,10 @@ func TestMonitorTaskLaunchedFlag(t *testing.T) {
 
 	monitor := NewMonitor(cfg, onIdle, onBusy, getState)
 
-	// Mock idle
 	monitor.checkIdle = func() (bool, string) {
 		return true, "CPU at 20.0%"
 	}
 
-	// Three idle ticks
 	monitor.tick(1)
 	monitor.tick(1)
 	monitor.tick(1)
@@ -129,7 +124,6 @@ func TestMonitorTaskLaunchedFlag(t *testing.T) {
 		t.Errorf("Expected OnIdle called once, got %d", idleCount)
 	}
 
-	// Two more idle ticks should NOT call OnIdle again
 	monitor.tick(1)
 	monitor.tick(1)
 
@@ -137,13 +131,11 @@ func TestMonitorTaskLaunchedFlag(t *testing.T) {
 		t.Errorf("Expected OnIdle still called once, got %d", idleCount)
 	}
 
-	// Simulate a busy spike
 	monitor.checkIdle = func() (bool, string) {
 		return false, "CPU at 80.0%"
 	}
 	monitor.tick(1)
 
-	// Reset to idle
 	monitor.checkIdle = func() (bool, string) {
 		return true, "CPU at 20.0%"
 	}
@@ -162,7 +154,7 @@ func TestMonitorUserIdleMode(t *testing.T) {
 		IdleMode:      IdleModeUserIdle,
 		IdleDuration:  60,
 		CheckInterval: 5,
-		CPUThreshold:  15, // should be ignored
+		CPUThreshold:  15,
 	}
 
 	idleTriggered := false
@@ -172,12 +164,10 @@ func TestMonitorUserIdleMode(t *testing.T) {
 
 	monitor := NewMonitor(cfg, onIdle, onBusy, getState)
 
-	// Mock: user idle for 90 seconds (above 60s threshold)
 	monitor.checkIdle = func() (bool, string) {
 		return true, "User idle 90s"
 	}
 
-	// In user_idle mode, checksNeeded=1, so one tick suffices
 	monitor.tick(1)
 
 	if !idleTriggered {
@@ -200,7 +190,6 @@ func TestMonitorUserIdleBusy(t *testing.T) {
 
 	monitor := NewMonitor(cfg, onIdle, onBusy, getState)
 
-	// Mock: user active (only 5s idle, below 60s threshold)
 	monitor.checkIdle = func() (bool, string) {
 		return false, "User idle 5s"
 	}
@@ -209,5 +198,130 @@ func TestMonitorUserIdleBusy(t *testing.T) {
 
 	if !busyTriggered {
 		t.Error("Expected OnBusy to trigger when user becomes active")
+	}
+}
+
+func TestMonitorTickIdleWhenPaused(t *testing.T) {
+	cfg := Config{
+		CPUThreshold:  50.0,
+		IdleDuration:  1,
+		CheckInterval: 1,
+	}
+
+	idleCount := 0
+	onIdle := func() { idleCount++ }
+	onBusy := func() {}
+	getState := func() TaskState { return Paused }
+
+	monitor := NewMonitor(cfg, onIdle, onBusy, getState)
+	monitor.taskLaunched = true // task was already launched once
+
+	monitor.checkIdle = func() (bool, string) {
+		return true, "CPU at 10.0%"
+	}
+
+	monitor.tick(1)
+
+	if idleCount != 1 {
+		t.Errorf("Expected OnIdle called once to resume paused task, got %d", idleCount)
+	}
+}
+
+func TestMonitorTickRestartOnIdle(t *testing.T) {
+	cfg := Config{
+		CPUThreshold:  50.0,
+		IdleDuration:  1,
+		CheckInterval: 1,
+		Restart:       true,
+	}
+
+	idleCount := 0
+	onIdle := func() { idleCount++ }
+	onBusy := func() {}
+	getState := func() TaskState { return Stopped }
+
+	monitor := NewMonitor(cfg, onIdle, onBusy, getState)
+	monitor.taskLaunched = true // task was already launched and completed
+
+	monitor.checkIdle = func() (bool, string) {
+		return true, "CPU at 10.0%"
+	}
+
+	monitor.tick(1)
+
+	if idleCount != 1 {
+		t.Errorf("Expected OnIdle called once to restart task, got %d", idleCount)
+	}
+}
+
+func TestMonitorTickBusyNotRunning(t *testing.T) {
+	cfg := Config{
+		CPUThreshold:  50.0,
+		IdleDuration:  3,
+		CheckInterval: 1,
+	}
+
+	busyCalled := false
+	onIdle := func() {}
+	onBusy := func() { busyCalled = true }
+	getState := func() TaskState { return Stopped }
+
+	monitor := NewMonitor(cfg, onIdle, onBusy, getState)
+	monitor.idleCount = 2 // was idle, now goes busy
+
+	monitor.checkIdle = func() (bool, string) {
+		return false, "CPU at 80.0%"
+	}
+
+	monitor.tick(3) // busy but task not Running — logs but no OnBusy call
+
+	if busyCalled {
+		t.Error("Expected OnBusy NOT to be called when task is not Running")
+	}
+	if monitor.idleCount != 0 {
+		t.Errorf("Expected idleCount reset to 0, got %d", monitor.idleCount)
+	}
+}
+
+func TestMonitorCheckCPUIdle(t *testing.T) {
+	cfg := Config{
+		CPUThreshold:  50.0,
+		IdleDuration:  5,
+		CheckInterval: 1,
+	}
+
+	onIdle := func() {}
+	onBusy := func() {}
+	getState := func() TaskState { return Stopped }
+
+	monitor := NewMonitor(cfg, onIdle, onBusy, getState)
+
+	// Call the real checkCPUIdle — should not panic and return a valid detail
+	idle, detail := monitor.checkCPUIdle()
+	_ = idle
+	if detail == "" {
+		t.Error("Expected non-empty detail from checkCPUIdle")
+	}
+}
+
+func TestMonitorCheckUserIdle(t *testing.T) {
+	cfg := Config{
+		IdleMode:      IdleModeUserIdle,
+		IdleDuration:  300,
+		CheckInterval: 5,
+		CPUThreshold:  15,
+	}
+
+	onIdle := func() {}
+	onBusy := func() {}
+	getState := func() TaskState { return Stopped }
+
+	monitor := NewMonitor(cfg, onIdle, onBusy, getState)
+
+	// Call the real checkUserIdle — should not panic
+	idle, detail := monitor.checkUserIdle()
+	_ = idle
+	if detail == "" {
+		t.Error("Expected non-empty detail from checkUserIdle")
 	}
 }

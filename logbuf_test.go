@@ -9,7 +9,6 @@ import (
 func TestLogBufferWrite(t *testing.T) {
 	buf := NewLogBuffer(10)
 
-	// Write a single line
 	n, err := buf.Write([]byte("line 1\n"))
 	if err != nil {
 		t.Fatalf("Write failed: %v", err)
@@ -42,19 +41,18 @@ func TestLogBufferMultipleLines(t *testing.T) {
 }
 
 func TestLogBufferRingBehavior(t *testing.T) {
-	buf := NewLogBuffer(3) // max 3 lines
+	buf := NewLogBuffer(3)
 
 	buf.Write([]byte("line 1\n"))
 	buf.Write([]byte("line 2\n"))
 	buf.Write([]byte("line 3\n"))
-	buf.Write([]byte("line 4\n")) // Should evict line 1
+	buf.Write([]byte("line 4\n"))
 
 	lines := buf.Lines()
 	if len(lines) != 3 {
 		t.Fatalf("Expected 3 lines (ring buffer), got %d", len(lines))
 	}
 
-	// Oldest line (line 1) should be gone
 	if lines[0] != "line 2" || lines[1] != "line 3" || lines[2] != "line 4" {
 		t.Errorf("Expected [line 2, line 3, line 4], got %v", lines)
 	}
@@ -64,7 +62,6 @@ func TestLogBufferOnChange(t *testing.T) {
 	buf := NewLogBuffer(10)
 
 	callCount := 0
-
 	buf.SetOnChange(func() {
 		callCount++
 	})
@@ -81,7 +78,6 @@ func TestLogBufferConcurrent(t *testing.T) {
 	buf := NewLogBuffer(100)
 	var wg sync.WaitGroup
 
-	// 10 goroutines writing concurrently
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func(id int) {
@@ -95,7 +91,6 @@ func TestLogBufferConcurrent(t *testing.T) {
 	wg.Wait()
 
 	lines := buf.Lines()
-	// Should have 100 lines total (or fewer if ring buffer kicked in)
 	if len(lines) == 0 {
 		t.Error("Expected some lines after concurrent writes")
 	}
@@ -109,7 +104,6 @@ func TestLogBufferLinesReturnsACopy(t *testing.T) {
 	buf.Write([]byte("line 2\n"))
 	lines2 := buf.Lines()
 
-	// lines1 should not have been mutated
 	if len(lines1) != 1 {
 		t.Errorf("Expected lines1 to still have 1 element, got %d", len(lines1))
 	}
@@ -122,7 +116,6 @@ func TestLogBufferWithMultiWriter(t *testing.T) {
 	buf := NewLogBuffer(10)
 	var sb strings.Builder
 
-	// Simulating io.MultiWriter behavior
 	data := []byte("test line\n")
 	buf.Write(data)
 	sb.Write(data)
@@ -134,5 +127,59 @@ func TestLogBufferWithMultiWriter(t *testing.T) {
 
 	if sb.String() != "test line\n" {
 		t.Errorf("StringBuilder: expected 'test line\\n', got %q", sb.String())
+	}
+}
+
+func TestLogBufferClear(t *testing.T) {
+	buf := NewLogBuffer(10)
+	buf.Write([]byte("line 1\n"))
+	buf.Write([]byte("line 2\n"))
+
+	if len(buf.Lines()) != 2 {
+		t.Fatalf("Expected 2 lines before clear")
+	}
+
+	buf.Clear()
+
+	if len(buf.Lines()) != 0 {
+		t.Errorf("Expected 0 lines after clear, got %d", len(buf.Lines()))
+	}
+}
+
+func TestLogBufferClearCallsOnChange(t *testing.T) {
+	buf := NewLogBuffer(10)
+	buf.Write([]byte("line 1\n"))
+
+	called := false
+	buf.SetOnChange(func() { called = true })
+	buf.Clear()
+
+	if !called {
+		t.Error("Expected onChange to be called on Clear")
+	}
+}
+
+func TestLogBufferSetOnChangeNil(t *testing.T) {
+	buf := NewLogBuffer(10)
+
+	buf.SetOnChange(func() {})
+	buf.SetOnChange(nil) // unregister — must not panic
+
+	buf.Write([]byte("line 1\n")) // should not call nil callback
+	buf.Clear()                   // should not call nil callback
+}
+
+func TestLogBufferWriteMiddleEmptyLine(t *testing.T) {
+	buf := NewLogBuffer(10)
+
+	// Empty line in the middle (not a trailing newline) is kept
+	buf.Write([]byte("line 1\n\nline 3\n"))
+
+	lines := buf.Lines()
+	if len(lines) != 3 {
+		t.Fatalf("Expected 3 lines (including middle empty), got %d: %v", len(lines), lines)
+	}
+	if lines[0] != "line 1" || lines[1] != "" || lines[2] != "line 3" {
+		t.Errorf("Expected [line 1, , line 3], got %v", lines)
 	}
 }

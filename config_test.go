@@ -7,7 +7,6 @@ import (
 )
 
 func TestLoadConfigValid(t *testing.T) {
-	// Create a temporary config file
 	tmpdir := t.TempDir()
 	configPath := filepath.Join(tmpdir, "config.json")
 
@@ -44,7 +43,6 @@ func TestLoadConfigDefaults(t *testing.T) {
 	tmpdir := t.TempDir()
 	configPath := filepath.Join(tmpdir, "config.json")
 
-	// Minimal config without optional fields
 	configContent := `{
 		"command": "/bin/sh",
 		"working_dir": "/tmp"
@@ -70,13 +68,34 @@ func TestLoadConfigDefaults(t *testing.T) {
 	}
 }
 
+func TestLoadConfigFileNotFound(t *testing.T) {
+	_, err := LoadConfig("/nonexistent/path/to/config.json")
+	if err == nil {
+		t.Error("Expected error for non-existent config file")
+	}
+}
+
+func TestLoadConfigInvalidJSON(t *testing.T) {
+	tmpdir := t.TempDir()
+	configPath := filepath.Join(tmpdir, "config.json")
+
+	if err := os.WriteFile(configPath, []byte(`{invalid json`), 0644); err != nil {
+		t.Fatalf("Failed to write temp config: %v", err)
+	}
+
+	_, err := LoadConfig(configPath)
+	if err == nil {
+		t.Error("Expected error for invalid JSON")
+	}
+}
+
 func TestValidateInvalidThreshold(t *testing.T) {
 	cfg := Config{
-		CPUThreshold: 150.0, // Invalid: > 100
-		IdleDuration: 60,
+		CPUThreshold:  150.0,
+		IdleDuration:  60,
 		CheckInterval: 5,
-		Command: "/bin/echo",
-		WorkingDir: "/tmp",
+		Command:       "/bin/echo",
+		WorkingDir:    "/tmp",
 	}
 
 	if err := cfg.Validate(); err == nil {
@@ -84,13 +103,27 @@ func TestValidateInvalidThreshold(t *testing.T) {
 	}
 }
 
+func TestValidateZeroThreshold(t *testing.T) {
+	cfg := Config{
+		CPUThreshold:  0,
+		IdleDuration:  60,
+		CheckInterval: 5,
+		Command:       "/bin/echo",
+		IdleMode:      IdleModeCPU,
+	}
+
+	if err := cfg.Validate(); err == nil {
+		t.Error("Expected validation error for CPUThreshold = 0")
+	}
+}
+
 func TestValidateInvalidDuration(t *testing.T) {
 	cfg := Config{
-		CPUThreshold: 20.0,
-		IdleDuration: -10, // Invalid: negative
+		CPUThreshold:  20.0,
+		IdleDuration:  -10,
 		CheckInterval: 5,
-		Command: "/bin/echo",
-		WorkingDir: "/tmp",
+		Command:       "/bin/echo",
+		WorkingDir:    "/tmp",
 	}
 
 	if err := cfg.Validate(); err == nil {
@@ -98,13 +131,28 @@ func TestValidateInvalidDuration(t *testing.T) {
 	}
 }
 
+func TestValidateInvalidCheckInterval(t *testing.T) {
+	cfg := Config{
+		CPUThreshold:  20.0,
+		IdleDuration:  60,
+		CheckInterval: 0,
+		Command:       "/bin/echo",
+		WorkingDir:    "/tmp",
+		IdleMode:      IdleModeCPU,
+	}
+
+	if err := cfg.Validate(); err == nil {
+		t.Error("Expected validation error for CheckInterval = 0")
+	}
+}
+
 func TestValidateNoCommand(t *testing.T) {
 	cfg := Config{
-		CPUThreshold: 20.0,
-		IdleDuration: 60,
+		CPUThreshold:  20.0,
+		IdleDuration:  60,
 		CheckInterval: 5,
-		Command: "", // Invalid: required
-		WorkingDir: "/tmp",
+		Command:       "",
+		WorkingDir:    "/tmp",
 	}
 
 	if err := cfg.Validate(); err == nil {
@@ -114,15 +162,37 @@ func TestValidateNoCommand(t *testing.T) {
 
 func TestValidateInvalidWorkingDir(t *testing.T) {
 	cfg := Config{
-		CPUThreshold: 20.0,
-		IdleDuration: 60,
+		CPUThreshold:  20.0,
+		IdleDuration:  60,
 		CheckInterval: 5,
-		Command: "/bin/echo",
-		WorkingDir: "/nonexistent/path/that/should/not/exist",
+		Command:       "/bin/echo",
+		WorkingDir:    "/nonexistent/path/that/should/not/exist",
 	}
 
 	if err := cfg.Validate(); err == nil {
 		t.Error("Expected validation error for non-existent WorkingDir")
+	}
+}
+
+func TestValidateWorkingDirIsFile(t *testing.T) {
+	tmpdir := t.TempDir()
+	filePath := filepath.Join(tmpdir, "not_a_dir.txt")
+
+	if err := os.WriteFile(filePath, []byte("x"), 0644); err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+
+	cfg := Config{
+		CPUThreshold:  20.0,
+		IdleDuration:  60,
+		CheckInterval: 5,
+		Command:       "/bin/echo",
+		WorkingDir:    filePath,
+		IdleMode:      IdleModeCPU,
+	}
+
+	if err := cfg.Validate(); err == nil {
+		t.Error("Expected validation error when WorkingDir is a file, not a directory")
 	}
 }
 
@@ -142,17 +212,14 @@ func TestSaveConfig(t *testing.T) {
 		Restart:       true,
 	}
 
-	// Save config
 	if err := SaveConfig(configPath, cfg); err != nil {
 		t.Fatalf("SaveConfig failed: %v", err)
 	}
 
-	// Verify file exists
 	if _, err := os.Stat(configPath); err != nil {
 		t.Fatalf("Config file was not created: %v", err)
 	}
 
-	// Load it back and verify
 	loaded, err := LoadConfig(configPath)
 	if err != nil {
 		t.Fatalf("LoadConfig failed: %v", err)
@@ -183,7 +250,6 @@ func TestSaveConfigInvalidPath(t *testing.T) {
 		Command: "/bin/echo",
 	}
 
-	// Try to save to a non-existent directory
 	err := SaveConfig("/nonexistent/dir/config.json", cfg)
 	if err == nil {
 		t.Error("Expected error when saving to non-existent directory")
@@ -194,7 +260,6 @@ func TestIdleModeDefault(t *testing.T) {
 	tmpdir := t.TempDir()
 	configPath := filepath.Join(tmpdir, "config.json")
 
-	// Config without idle_mode should default to "cpu"
 	configContent := `{
 		"command": "/bin/echo",
 		"working_dir": "/tmp"
