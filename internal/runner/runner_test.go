@@ -1,12 +1,14 @@
-package main
+package runner
 
 import (
 	"testing"
 	"time"
+
+	"whenidle/internal/config"
 )
 
 func TestTaskRunnerStateMachine(t *testing.T) {
-	cfg := Config{
+	cfg := config.Config{
 		Command:    "/bin/echo",
 		Args:       []string{"test"},
 		WorkingDir: "/tmp",
@@ -32,7 +34,7 @@ func TestTaskRunnerStateMachine(t *testing.T) {
 }
 
 func TestTaskRunnerPausableTask(t *testing.T) {
-	cfg := Config{
+	cfg := config.Config{
 		Command:    "/bin/sleep",
 		Args:       []string{"2"},
 		WorkingDir: "/tmp",
@@ -70,7 +72,7 @@ func TestTaskRunnerPausableTask(t *testing.T) {
 }
 
 func TestTaskRunnerStopWithoutStart(t *testing.T) {
-	cfg := Config{
+	cfg := config.Config{
 		Command:    "/bin/echo",
 		Args:       []string{"test"},
 		WorkingDir: "/tmp",
@@ -85,7 +87,7 @@ func TestTaskRunnerStopWithoutStart(t *testing.T) {
 }
 
 func TestTaskRunnerStopFromPaused(t *testing.T) {
-	cfg := Config{
+	cfg := config.Config{
 		Command:    "/bin/sleep",
 		Args:       []string{"5"},
 		WorkingDir: "/tmp",
@@ -112,7 +114,7 @@ func TestTaskRunnerStopFromPaused(t *testing.T) {
 }
 
 func TestTaskRunnerOnIdleWhenRunning(t *testing.T) {
-	cfg := Config{
+	cfg := config.Config{
 		Command:    "/bin/sleep",
 		Args:       []string{"2"},
 		WorkingDir: "/tmp",
@@ -133,7 +135,7 @@ func TestTaskRunnerOnIdleWhenRunning(t *testing.T) {
 }
 
 func TestTaskRunnerOnBusyWhenStopped(t *testing.T) {
-	cfg := Config{
+	cfg := config.Config{
 		Command:    "/bin/echo",
 		Args:       []string{"test"},
 		WorkingDir: "/tmp",
@@ -149,7 +151,7 @@ func TestTaskRunnerOnBusyWhenStopped(t *testing.T) {
 }
 
 func TestTaskRunnerStartFailure(t *testing.T) {
-	cfg := Config{
+	cfg := config.Config{
 		Command:    "/nonexistent/command/that/does/not/exist",
 		WorkingDir: "/tmp",
 	}
@@ -164,7 +166,7 @@ func TestTaskRunnerStartFailure(t *testing.T) {
 }
 
 func TestTaskRunnerWaitDone(t *testing.T) {
-	cfg := Config{
+	cfg := config.Config{
 		Command:    "/bin/echo",
 		Args:       []string{"hello"},
 		WorkingDir: "/tmp",

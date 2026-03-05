@@ -1,4 +1,4 @@
-package main
+package monitor
 
 import (
 	"context"
@@ -7,6 +7,9 @@ import (
 	"time"
 
 	"github.com/shirou/gopsutil/v4/cpu"
+
+	"whenidle/internal/config"
+	"whenidle/internal/runner"
 )
 
 // Monitor watches for system idleness and triggers task start/pause accordingly.
@@ -18,25 +21,25 @@ import (
 // The idle detection strategy is injected via checkIdle function, making the Monitor
 // testable and extensible without interface overhead.
 type Monitor struct {
-	config       Config
+	config       config.Config
 	idleCount    int
 	taskLaunched bool // true once we triggered a task in this idle period
 	onIdle       func()
 	onBusy       func()
-	getState     func() TaskState
+	getState     func() runner.TaskState
 	checkIdle    func() (idle bool, detail string) // pluggable idle detection strategy
 }
 
-func NewMonitor(config Config, onIdle func(), onBusy func(), getState func() TaskState) *Monitor {
+func NewMonitor(cfg config.Config, onIdle func(), onBusy func(), getState func() runner.TaskState) *Monitor {
 	m := &Monitor{
-		config:   config,
+		config:   cfg,
 		onIdle:   onIdle,
 		onBusy:   onBusy,
 		getState: getState,
 	}
 
-	switch config.IdleMode {
-	case IdleModeUserIdle:
+	switch cfg.IdleMode {
+	case config.IdleModeUserIdle:
 		m.checkIdle = m.checkUserIdle
 	default:
 		m.checkIdle = m.checkCPUIdle
@@ -47,7 +50,7 @@ func NewMonitor(config Config, onIdle func(), onBusy func(), getState func() Tas
 
 func (m *Monitor) Start(ctx context.Context) {
 	var checksNeeded int
-	if m.config.IdleMode == IdleModeUserIdle {
+	if m.config.IdleMode == config.IdleModeUserIdle {
 		checksNeeded = 1 // UserIdleSeconds already measures cumulative duration
 		log.Printf("[INFO] Monitor started: user idle mode, idle after %ds, polling every %ds",
 			m.config.IdleDuration, m.config.CheckInterval)
@@ -84,7 +87,7 @@ func (m *Monitor) tick(checksNeeded int) {
 	if idle {
 		m.idleCount++
 
-		if state != Running {
+		if state != runner.Running {
 			log.Printf("[INFO] %s - idle for %d/%d checks (task: %s)",
 				detail, m.idleCount, checksNeeded, state)
 		}
@@ -95,16 +98,16 @@ func (m *Monitor) tick(checksNeeded int) {
 				m.taskLaunched = true
 				log.Println("[INFO] System is idle - triggering task")
 				m.onIdle()
-			case state == Stopped && m.config.Restart:
+			case state == runner.Stopped && m.config.Restart:
 				log.Println("[INFO] Task finished, restarting")
 				m.onIdle()
-			case state == Paused:
+			case state == runner.Paused:
 				log.Println("[INFO] System is idle again - resuming task")
 				m.onIdle()
 			}
 		}
 	} else {
-		if state == Running {
+		if state == runner.Running {
 			log.Printf("[INFO] %s - busy, pausing task", detail)
 			m.onBusy()
 		} else if m.idleCount > 0 {

@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"os"
@@ -246,10 +246,10 @@ func TestSaveConfig(t *testing.T) {
 
 func TestSaveConfigInvalidPath(t *testing.T) {
 	cfg := Config{
-		CPUThreshold: 20.0,
-		IdleDuration: 60,
+		CPUThreshold:  20.0,
+		IdleDuration:  60,
 		CheckInterval: 5,
-		Command: "/bin/echo",
+		Command:       "/bin/echo",
 	}
 
 	err := SaveConfig("/nonexistent/dir/config.json", cfg)

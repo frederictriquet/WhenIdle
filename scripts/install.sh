@@ -10,7 +10,7 @@ echo "=== WhenIdle Installer ==="
 
 # Build
 echo "Building..."
-CGO_ENABLED=1 go build -o whenidle .
+CGO_ENABLED=1 go build -o whenidle ./cmd/whenidle/
 
 # Create .app bundle (LSUIElement=true hides from Dock)
 echo "Creating app bundle at $APP_DIR/"

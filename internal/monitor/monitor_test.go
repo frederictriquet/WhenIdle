@@ -1,13 +1,16 @@
-package main
+package monitor
 
 import (
 	"context"
 	"testing"
 	"time"
+
+	"whenidle/internal/config"
+	"whenidle/internal/runner"
 )
 
 func TestMonitorIdleDetection(t *testing.T) {
-	cfg := Config{
+	cfg := config.Config{
 		CPUThreshold:  50.0,
 		IdleDuration:  3,
 		CheckInterval: 1,
@@ -21,8 +24,8 @@ func TestMonitorIdleDetection(t *testing.T) {
 
 	onBusy := func() {}
 
-	getState := func() TaskState {
-		return Stopped
+	getState := func() runner.TaskState {
+		return runner.Stopped
 	}
 
 	monitor := NewMonitor(cfg, onIdle, onBusy, getState)
@@ -41,7 +44,7 @@ func TestMonitorIdleDetection(t *testing.T) {
 }
 
 func TestMonitorBusyDetection(t *testing.T) {
-	cfg := Config{
+	cfg := config.Config{
 		CPUThreshold:  20.0,
 		IdleDuration:  2,
 		CheckInterval: 1,
@@ -55,8 +58,8 @@ func TestMonitorBusyDetection(t *testing.T) {
 		busyTriggered = true
 	}
 
-	getState := func() TaskState {
-		return Running
+	getState := func() runner.TaskState {
+		return runner.Running
 	}
 
 	monitor := NewMonitor(cfg, onIdle, onBusy, getState)
@@ -73,7 +76,7 @@ func TestMonitorBusyDetection(t *testing.T) {
 }
 
 func TestMonitorContextCancel(t *testing.T) {
-	cfg := Config{
+	cfg := config.Config{
 		CPUThreshold:  20.0,
 		IdleDuration:  10,
 		CheckInterval: 1,
@@ -81,7 +84,7 @@ func TestMonitorContextCancel(t *testing.T) {
 
 	onIdle := func() {}
 	onBusy := func() {}
-	getState := func() TaskState { return Stopped }
+	getState := func() runner.TaskState { return runner.Stopped }
 
 	monitor := NewMonitor(cfg, onIdle, onBusy, getState)
 
@@ -96,8 +99,8 @@ func TestMonitorContextCancel(t *testing.T) {
 }
 
 func TestMonitorStartUserIdleMode(t *testing.T) {
-	cfg := Config{
-		IdleMode:      IdleModeUserIdle,
+	cfg := config.Config{
+		IdleMode:      config.IdleModeUserIdle,
 		IdleDuration:  9999,
 		CheckInterval: 1,
 		CPUThreshold:  15,
@@ -105,7 +108,7 @@ func TestMonitorStartUserIdleMode(t *testing.T) {
 
 	onIdle := func() {}
 	onBusy := func() {}
-	getState := func() TaskState { return Stopped }
+	getState := func() runner.TaskState { return runner.Stopped }
 
 	monitor := NewMonitor(cfg, onIdle, onBusy, getState)
 
@@ -119,7 +122,7 @@ func TestMonitorStartUserIdleMode(t *testing.T) {
 }
 
 func TestMonitorTaskLaunchedFlag(t *testing.T) {
-	cfg := Config{
+	cfg := config.Config{
 		CPUThreshold:  50.0,
 		IdleDuration:  1,
 		CheckInterval: 1,
@@ -131,7 +134,7 @@ func TestMonitorTaskLaunchedFlag(t *testing.T) {
 	}
 
 	onBusy := func() {}
-	getState := func() TaskState { return Stopped }
+	getState := func() runner.TaskState { return runner.Stopped }
 
 	monitor := NewMonitor(cfg, onIdle, onBusy, getState)
 
@@ -173,8 +176,8 @@ func TestMonitorTaskLaunchedFlag(t *testing.T) {
 }
 
 func TestMonitorUserIdleMode(t *testing.T) {
-	cfg := Config{
-		IdleMode:      IdleModeUserIdle,
+	cfg := config.Config{
+		IdleMode:      config.IdleModeUserIdle,
 		IdleDuration:  60,
 		CheckInterval: 5,
 		CPUThreshold:  15,
@@ -183,7 +186,7 @@ func TestMonitorUserIdleMode(t *testing.T) {
 	idleTriggered := false
 	onIdle := func() { idleTriggered = true }
 	onBusy := func() {}
-	getState := func() TaskState { return Stopped }
+	getState := func() runner.TaskState { return runner.Stopped }
 
 	monitor := NewMonitor(cfg, onIdle, onBusy, getState)
 
@@ -199,8 +202,8 @@ func TestMonitorUserIdleMode(t *testing.T) {
 }
 
 func TestMonitorUserIdleBusy(t *testing.T) {
-	cfg := Config{
-		IdleMode:      IdleModeUserIdle,
+	cfg := config.Config{
+		IdleMode:      config.IdleModeUserIdle,
 		IdleDuration:  60,
 		CheckInterval: 5,
 		CPUThreshold:  15,
@@ -209,7 +212,7 @@ func TestMonitorUserIdleBusy(t *testing.T) {
 	busyTriggered := false
 	onIdle := func() {}
 	onBusy := func() { busyTriggered = true }
-	getState := func() TaskState { return Running }
+	getState := func() runner.TaskState { return runner.Running }
 
 	monitor := NewMonitor(cfg, onIdle, onBusy, getState)
 
@@ -225,7 +228,7 @@ func TestMonitorUserIdleBusy(t *testing.T) {
 }
 
 func TestMonitorTickIdleWhenPaused(t *testing.T) {
-	cfg := Config{
+	cfg := config.Config{
 		CPUThreshold:  50.0,
 		IdleDuration:  1,
 		CheckInterval: 1,
@@ -234,7 +237,7 @@ func TestMonitorTickIdleWhenPaused(t *testing.T) {
 	idleCount := 0
 	onIdle := func() { idleCount++ }
 	onBusy := func() {}
-	getState := func() TaskState { return Paused }
+	getState := func() runner.TaskState { return runner.Paused }
 
 	monitor := NewMonitor(cfg, onIdle, onBusy, getState)
 	monitor.taskLaunched = true // task was already launched once
@@ -251,7 +254,7 @@ func TestMonitorTickIdleWhenPaused(t *testing.T) {
 }
 
 func TestMonitorTickRestartOnIdle(t *testing.T) {
-	cfg := Config{
+	cfg := config.Config{
 		CPUThreshold:  50.0,
 		IdleDuration:  1,
 		CheckInterval: 1,
@@ -261,7 +264,7 @@ func TestMonitorTickRestartOnIdle(t *testing.T) {
 	idleCount := 0
 	onIdle := func() { idleCount++ }
 	onBusy := func() {}
-	getState := func() TaskState { return Stopped }
+	getState := func() runner.TaskState { return runner.Stopped }
 
 	monitor := NewMonitor(cfg, onIdle, onBusy, getState)
 	monitor.taskLaunched = true // task was already launched and completed
@@ -278,7 +281,7 @@ func TestMonitorTickRestartOnIdle(t *testing.T) {
 }
 
 func TestMonitorTickBusyNotRunning(t *testing.T) {
-	cfg := Config{
+	cfg := config.Config{
 		CPUThreshold:  50.0,
 		IdleDuration:  3,
 		CheckInterval: 1,
@@ -287,7 +290,7 @@ func TestMonitorTickBusyNotRunning(t *testing.T) {
 	busyCalled := false
 	onIdle := func() {}
 	onBusy := func() { busyCalled = true }
-	getState := func() TaskState { return Stopped }
+	getState := func() runner.TaskState { return runner.Stopped }
 
 	monitor := NewMonitor(cfg, onIdle, onBusy, getState)
 	monitor.idleCount = 2 // was idle, now goes busy
@@ -307,7 +310,7 @@ func TestMonitorTickBusyNotRunning(t *testing.T) {
 }
 
 func TestMonitorCheckCPUIdle(t *testing.T) {
-	cfg := Config{
+	cfg := config.Config{
 		CPUThreshold:  50.0,
 		IdleDuration:  5,
 		CheckInterval: 1,
@@ -315,7 +318,7 @@ func TestMonitorCheckCPUIdle(t *testing.T) {
 
 	onIdle := func() {}
 	onBusy := func() {}
-	getState := func() TaskState { return Stopped }
+	getState := func() runner.TaskState { return runner.Stopped }
 
 	monitor := NewMonitor(cfg, onIdle, onBusy, getState)
 
@@ -328,8 +331,8 @@ func TestMonitorCheckCPUIdle(t *testing.T) {
 }
 
 func TestMonitorCheckUserIdle(t *testing.T) {
-	cfg := Config{
-		IdleMode:      IdleModeUserIdle,
+	cfg := config.Config{
+		IdleMode:      config.IdleModeUserIdle,
 		IdleDuration:  300,
 		CheckInterval: 5,
 		CPUThreshold:  15,
@@ -337,7 +340,7 @@ func TestMonitorCheckUserIdle(t *testing.T) {
 
 	onIdle := func() {}
 	onBusy := func() {}
-	getState := func() TaskState { return Stopped }
+	getState := func() runner.TaskState { return runner.Stopped }
 
 	monitor := NewMonitor(cfg, onIdle, onBusy, getState)
 

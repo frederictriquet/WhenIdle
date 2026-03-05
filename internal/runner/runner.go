@@ -1,4 +1,4 @@
-package main
+package runner
 
 import (
 	"fmt"
@@ -9,6 +9,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"whenidle/internal/config"
 )
 
 type TaskState int
@@ -33,7 +35,7 @@ func (s TaskState) String() string {
 }
 
 type TaskRunner struct {
-	config Config
+	config config.Config
 	cmd    *exec.Cmd
 	state  TaskState
 	mu     sync.Mutex
@@ -41,10 +43,10 @@ type TaskRunner struct {
 	env    []string // environment for spawned processes
 }
 
-func NewTaskRunner(config Config) *TaskRunner {
+func NewTaskRunner(cfg config.Config) *TaskRunner {
 	env := resolveLoginEnv()
 	return &TaskRunner{
-		config: config,
+		config: cfg,
 		state:  Stopped,
 		env:    env,
 	}

@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"encoding/json"
@@ -49,7 +49,7 @@ func LoadConfig(path string) (Config, error) {
 		return Config{}, fmt.Errorf("cannot parse config file: %w", err)
 	}
 
-	cfg.applyDefaults()
+	cfg.ApplyDefaults()
 
 	if err := cfg.Validate(); err != nil {
 		return Config{}, fmt.Errorf("invalid config: %w", err)
@@ -58,7 +58,7 @@ func LoadConfig(path string) (Config, error) {
 	return cfg, nil
 }
 
-func (c *Config) applyDefaults() {
+func (c *Config) ApplyDefaults() {
 	if c.CPUThreshold == 0 {
 		c.CPUThreshold = defaultCPUThreshold
 	}
