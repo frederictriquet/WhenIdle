@@ -1,7 +1,7 @@
 # WhenIdle
 
 [![CI](https://github.com/frederictriquet/WhenIdle/actions/workflows/ci.yml/badge.svg)](https://github.com/frederictriquet/WhenIdle/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/frederictriquet/WhenIdle/graph/badge.svg)](https://codecov.io/gh/frederictriquet/WhenIdle)
+[![codecov](https://codecov.io/gh/frederictriquet/WhenIdle/branch/master/graph/badge.svg)](https://codecov.io/gh/frederictriquet/WhenIdle)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > Daemon macOS qui surveille l'utilisation CPU et lance automatiquement des tâches intensives pendant les périodes d'inactivité
